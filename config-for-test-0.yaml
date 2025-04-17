@@ -1,13 +1,18 @@
 # Media Organizer Configuration File for test paths
 
 # Source directory to scan for media files
-source: /Users/z/Downloads/_TEST_IMAGES/original
+# source: /Users/z/Downloads/_TEST_IMAGES/original
+source: "/Volumes/Crucial X6/media/img/jpg"
+
 
 # Destination directories for each media type
+# /Users/z/Downloads/_TEST_IMAGES/ab/image/raw
 destinations:
-  image: /Users/z/Downloads/_TEST_IMAGES/ab/image
-  video: /Users/z/Downloads/_TEST_IMAGES/ab/video
-  audio: /Users/z/Downloads/_TEST_IMAGES/ab/audio
+  image: "/Volumes/Crucial X6/media/img/1024+"
+  video: "/Volumes/Crucial X6/media/video"
+  audio: "/Volumes/Crucial X6/media/audio"
+
+
 
 # Dry run mode - set to true to simulate without moving files
 dry_run: false

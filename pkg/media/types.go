@@ -78,9 +78,9 @@ func DetermineMediaType(filePath string) MediaType {
 	switch ext {
 	case ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".nef", ".arw", ".cr2", ".cr3", ".dng", ".heic", ".raf":
 		return TypeImage
-	case ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm", ".m4v":
+	case ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm", ".m4v", ".mpeg", ".mpg", ".3gp", ".asf", ".m2v", ".vob":
 		return TypeVideo
-	case ".mp3", ".wav", ".aac", ".ogg", ".flac", ".m4a", ".wma":
+	case ".mp3", ".wav", ".aac", ".ogg", ".flac", ".m4a", ".wma", ".amr":
 		return TypeAudio
 	default:
 		return TypeUnknown
