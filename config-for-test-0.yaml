@@ -1,0 +1,22 @@
+# Media Organizer Configuration File for test paths
+
+# Source directory to scan for media files
+source: /Users/z/Downloads/_TEST_IMAGES/original
+
+# Destination directories for each media type
+destinations:
+  image: /Users/z/Downloads/_TEST_IMAGES/ab/image
+  video: /Users/z/Downloads/_TEST_IMAGES/ab/video
+  audio: /Users/z/Downloads/_TEST_IMAGES/ab/audio
+
+# Dry run mode - set to true to simulate without moving files
+dry_run: false
+
+# Copy files instead of moving them
+copy_files: false
+
+# Verbose logging
+verbose: false
+
+# Number of concurrent processing jobs
+concurrent_jobs: 4

@@ -1,0 +1,25 @@
+# Media Organizer Configuration File
+
+# Source directory to scan for media files
+source: /path/to/your/media/files
+
+# Destination directories for each media type
+destinations:
+  image: /path/to/organized/images
+  video: /path/to/organized/videos
+  audio: /path/to/organized/audio
+
+# Dry run mode - set to true to simulate without moving files
+dry_run: false
+
+# Copy files instead of moving them
+copy_files: false
+
+# Verbose logging
+verbose: true
+
+# Log file path (optional)
+log_file: organizer.log
+
+# Number of concurrent processing jobs
+concurrent_jobs: 4
