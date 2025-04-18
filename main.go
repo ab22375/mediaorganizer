@@ -31,6 +31,7 @@ func main() {
 	}
 	logrus.Debugf("Dry run: %v", cfg.DryRun)
 	logrus.Debugf("Copy files: %v", cfg.CopyFiles)
+	logrus.Debugf("Delete empty dirs: %v", cfg.DeleteEmptyDirs)
 	logrus.Debugf("Verbose: %v", cfg.Verbose)
 	logrus.Debugf("Log file: %s", cfg.LogFile)
 	logrus.Debugf("Concurrent jobs: %d", cfg.ConcurrentJobs)
@@ -56,12 +57,15 @@ func main() {
 			logrus.Infof("COPY MODE ENABLED (files will be copied instead of moved)")
 		} else {
 			logrus.Infof("MOVE MODE ENABLED (files will be moved from source to destination)")
+			if cfg.DeleteEmptyDirs {
+				logrus.Infof("DELETE EMPTY DIRS ENABLED (empty folders will be removed after moving files)")
+			}
 		}
 	}
 
 	// Create and start scanner
 	logrus.Debugf("Creating scanner...")
-	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.DestDirs, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs)
+	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.DestDirs, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
 	
 	logrus.Infof("Starting scan with %d concurrent workers...", cfg.ConcurrentJobs)
 	startTime := time.Now()

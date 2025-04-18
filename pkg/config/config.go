@@ -13,13 +13,14 @@ import (
 )
 
 type Config struct {
-	SourceDir      string            `mapstructure:"source"`
-	DestDirs       map[string]string `mapstructure:"destinations"`
-	DryRun         bool              `mapstructure:"dry_run"`
-	Verbose        bool              `mapstructure:"verbose"`
-	LogFile        string            `mapstructure:"log_file"`
-	ConcurrentJobs int               `mapstructure:"concurrent_jobs"`
-	CopyFiles      bool              `mapstructure:"copy_files"`
+	SourceDir       string            `mapstructure:"source"`
+	DestDirs        map[string]string `mapstructure:"destinations"`
+	DryRun          bool              `mapstructure:"dry_run"`
+	Verbose         bool              `mapstructure:"verbose"`
+	LogFile         string            `mapstructure:"log_file"`
+	ConcurrentJobs  int               `mapstructure:"concurrent_jobs"`
+	CopyFiles       bool              `mapstructure:"copy_files"`
+	DeleteEmptyDirs bool              `mapstructure:"delete_empty_dirs"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -47,6 +48,7 @@ func LoadConfig() (*Config, error) {
 	pflag.BoolVarP(&config.DryRun, "dry-run", "d", false, "Simulate the organization process without moving files")
 	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Enable verbose logging")
 	pflag.BoolVarP(&config.CopyFiles, "copy", "c", false, "Copy files instead of moving them")
+	pflag.BoolVar(&config.DeleteEmptyDirs, "delete-empty-dirs", false, "Delete empty folders in source directory after moving files")
 	pflag.StringVarP(&config.LogFile, "log-file", "l", "", "Log file path")
 	pflag.IntVarP(&config.ConcurrentJobs, "jobs", "j", config.ConcurrentJobs, "Number of concurrent processing jobs")
 
@@ -96,6 +98,10 @@ func LoadConfig() (*Config, error) {
 	
 	if pflag.Lookup("copy").Changed {
 		config.CopyFiles = pflag.Lookup("copy").Value.String() == "true"
+	}
+	
+	if pflag.Lookup("delete-empty-dirs").Changed {
+		config.DeleteEmptyDirs = pflag.Lookup("delete-empty-dirs").Value.String() == "true"
 	}
 	
 	if pflag.Lookup("log-file").Changed {

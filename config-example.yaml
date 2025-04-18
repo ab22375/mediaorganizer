@@ -15,6 +15,9 @@ dry_run: false
 # Copy files instead of moving them
 copy_files: false
 
+# Delete empty directories after moving files (only applies when move is used, not copy)
+delete_empty_dirs: false
+
 # Verbose logging
 verbose: true
 

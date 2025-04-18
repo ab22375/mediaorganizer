@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +30,7 @@ type MediaScanner struct {
 	destinationDirs  map[string]string
 	dryRun           bool
 	copyFiles        bool
+	deleteEmptyDirs  bool
 	concurrency      int
 	processingQueue  chan string
 	mediaMap         map[string][]*media.MediaFile // Maps date+dimension to files with same timestamp
@@ -38,12 +40,13 @@ type MediaScanner struct {
 	processed        int32 // Atomic counter for progress reporting
 }
 
-func NewMediaScanner(sourceDir string, destDirs map[string]string, dryRun bool, copyFiles bool, concurrency int) *MediaScanner {
+func NewMediaScanner(sourceDir string, destDirs map[string]string, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
 	return &MediaScanner{
 		sourceDir:       sourceDir,
 		destinationDirs: destDirs,
 		dryRun:          dryRun,
 		copyFiles:       copyFiles,
+		deleteEmptyDirs: deleteEmptyDirs,
 		concurrency:     concurrency,
 		processingQueue: make(chan string, 100),
 		mediaMap:        make(map[string][]*media.MediaFile),
@@ -101,6 +104,12 @@ func (s *MediaScanner) Scan() *ScanResult {
 	// Organize files by creating sequences for files with identical timestamps
 	logrus.Debugf("Organizing files")
 	s.organizeFiles()
+
+	// Delete empty directories if enabled and not in dry run mode
+	if s.deleteEmptyDirs && !s.dryRun && !s.copyFiles {
+		logrus.Infof("Cleaning up empty directories in source...")
+		s.cleanupEmptyDirectories()
+	}
 
 	s.result.EndTime = time.Now()
 	logrus.Debugf("Scan complete, processed %d files", s.result.ProcessedFiles)
@@ -209,8 +218,7 @@ func formatSequence(num int) string {
 func moveFile(srcPath, destPath string) error {
 	// Check if destination already exists
 	if _, err := os.Stat(destPath); err == nil {
-		logrus.Warnf("Destination file already exists: %s", destPath)
-		// If you want to overwrite or handle in a different way, modify this part
+		logrus.Infof("Skipped moving file (already exists at destination): %s -> %s", srcPath, destPath)
 		return nil
 	}
 
@@ -221,8 +229,7 @@ func moveFile(srcPath, destPath string) error {
 func copyFile(srcPath, destPath string) error {
 	// Check if destination already exists
 	if _, err := os.Stat(destPath); err == nil {
-		logrus.Warnf("Destination file already exists: %s", destPath)
-		// If you want to overwrite or handle in a different way, modify this part
+		logrus.Infof("Skipped copying file (already exists at destination): %s -> %s", srcPath, destPath)
 		return nil
 	}
 
@@ -263,4 +270,60 @@ func copyFile(srcPath, destPath string) error {
 // GetProcessedCount returns the current count of processed files
 func (s *MediaScanner) GetProcessedCount() int {
 	return int(atomic.LoadInt32(&s.processed))
+}
+
+// cleanupEmptyDirectories removes empty directories within the source directory
+func (s *MediaScanner) cleanupEmptyDirectories() {
+	var emptyDirs []string
+	var emptyDirsMutex sync.Mutex
+	var deletedCount int
+
+	// Walk the directory tree bottom-up to find empty directories
+	filepath.Walk(s.sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			logrus.Errorf("Error accessing path while cleaning up: %s: %v", path, err)
+			return nil
+		}
+
+		// Skip if it's not a directory or if it's the source directory itself
+		if !info.IsDir() || path == s.sourceDir {
+			return nil
+		}
+
+		// Check if directory is empty
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			logrus.Errorf("Error reading directory %s: %v", path, err)
+			return nil
+		}
+
+		if len(entries) == 0 {
+			emptyDirsMutex.Lock()
+			emptyDirs = append(emptyDirs, path)
+			emptyDirsMutex.Unlock()
+		}
+
+		return nil
+	})
+
+	// Sort directories by length in descending order to remove deepest directories first
+	sort.Slice(emptyDirs, func(i, j int) bool {
+		return len(emptyDirs[i]) > len(emptyDirs[j])
+	})
+
+	// Delete empty directories
+	for _, dir := range emptyDirs {
+		if err := os.Remove(dir); err != nil {
+			logrus.Errorf("Failed to remove empty directory %s: %v", dir, err)
+		} else {
+			logrus.Infof("Removed empty directory: %s", dir)
+			deletedCount++
+		}
+	}
+
+	if deletedCount > 0 {
+		logrus.Infof("Removed %d empty directories", deletedCount)
+	} else {
+		logrus.Infof("No empty directories found to remove")
+	}
 }
