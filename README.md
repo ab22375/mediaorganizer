@@ -74,6 +74,9 @@ go build
 
 # Setting number of concurrent jobs
 ./mediaorganizer --source /path/to/media/files --jobs 8
+
+# Delete empty directories after moving files
+./mediaorganizer --source /path/to/media/files --delete-empty-dirs
 ```
 
 ## Configuration File
@@ -92,6 +95,7 @@ copy_files: false
 verbose: true
 log_file: organizer.log
 concurrent_jobs: 8
+delete_empty_dirs: false
 ```
 
 ## Output Directory Structure
