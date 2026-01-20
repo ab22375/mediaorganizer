@@ -34,6 +34,7 @@ type MediaScanner struct {
 	extensionDirs    map[string]string
 	scheme           string
 	spaceReplacement string
+	noOriginalName   bool
 	dryRun           bool
 	copyFiles        bool
 	deleteEmptyDirs  bool
@@ -46,7 +47,7 @@ type MediaScanner struct {
 	processed        int32 // Atomic counter for progress reporting
 }
 
-func NewMediaScanner(sourceDir string, destination string, destDirs map[string]string, extensionDirs map[string]string, scheme string, spaceReplacement string, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
+func NewMediaScanner(sourceDir string, destination string, destDirs map[string]string, extensionDirs map[string]string, scheme string, spaceReplacement string, noOriginalName bool, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
 	return &MediaScanner{
 		sourceDir:        sourceDir,
 		destination:      destination,
@@ -54,6 +55,7 @@ func NewMediaScanner(sourceDir string, destination string, destDirs map[string]s
 		extensionDirs:    extensionDirs,
 		scheme:           scheme,
 		spaceReplacement: spaceReplacement,
+		noOriginalName:   noOriginalName,
 		dryRun:           dryRun,
 		copyFiles:        copyFiles,
 		deleteEmptyDirs:  deleteEmptyDirs,
@@ -202,7 +204,7 @@ func (s *MediaScanner) organizeFiles() {
 			isDuplicate := i > 0
 			
 			fileDir := file.GetDestinationPath(baseDestDir, extensionDir, isDuplicate, s.scheme)
-			fileName := file.GetNewFilename(s.scheme, s.spaceReplacement)
+			fileName := file.GetNewFilename(s.scheme, s.spaceReplacement, s.noOriginalName)
 			
 			// Add sequence if multiple files with same timestamp
 			if sequenceNum != "" {

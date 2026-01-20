@@ -68,26 +68,29 @@ func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDu
 	return destPath
 }
 
-func (m *MediaFile) GetNewFilename(scheme string, spaceReplacement string) string {
+func (m *MediaFile) GetNewFilename(scheme string, spaceReplacement string, noOriginalName bool) string {
 	ext := strings.ToLower(filepath.Ext(m.SourcePath))
 	timestamp := m.CreationTime.Format("20060102-150405")
 
 	// Get original name without extension for suffix
-	origNameWithoutExt := m.OriginalName
-	if len(origNameWithoutExt) > 0 {
-		// Remove extension(s)
-		for {
-			fileExt := filepath.Ext(origNameWithoutExt)
-			if fileExt == "" {
-				break
+	origNameWithoutExt := ""
+	if !noOriginalName {
+		origNameWithoutExt = m.OriginalName
+		if len(origNameWithoutExt) > 0 {
+			// Remove extension(s)
+			for {
+				fileExt := filepath.Ext(origNameWithoutExt)
+				if fileExt == "" {
+					break
+				}
+				origNameWithoutExt = strings.TrimSuffix(origNameWithoutExt, fileExt)
 			}
-			origNameWithoutExt = strings.TrimSuffix(origNameWithoutExt, fileExt)
 		}
-	}
 
-	// Replace spaces in the original name
-	if spaceReplacement != "" && spaceReplacement != " " {
-		origNameWithoutExt = strings.ReplaceAll(origNameWithoutExt, " ", spaceReplacement)
+		// Replace spaces in the original name
+		if spaceReplacement != "" && spaceReplacement != " " {
+			origNameWithoutExt = strings.ReplaceAll(origNameWithoutExt, " ", spaceReplacement)
+		}
 	}
 
 	if scheme == "date_first" {

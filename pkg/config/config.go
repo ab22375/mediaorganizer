@@ -42,6 +42,7 @@ type Config struct {
 	ExtensionDirs      map[string]string            `mapstructure:"extension_destinations"`
 	OrganizationScheme OrganizationScheme           `mapstructure:"organization_scheme"`
 	SpaceReplacement   string                       `mapstructure:"space_replacement"`
+	NoOriginalName     bool                         `mapstructure:"no_original_name"`
 	DryRun             bool                         `mapstructure:"dry_run"`
 	Verbose            bool                         `mapstructure:"verbose"`
 	LogFile            string                       `mapstructure:"log_file"`
@@ -83,10 +84,14 @@ func LoadConfig() (*Config, error) {
 	pflag.StringVarP(&config.LogFile, "log-file", "l", "", "Log file path")
 	pflag.IntVarP(&config.ConcurrentJobs, "jobs", "j", config.ConcurrentJobs, "Number of concurrent processing jobs")
 	pflag.StringVar(&schemeFlag, "scheme", string(config.OrganizationScheme), "Organization scheme: extension_first (default) or date_first")
-	pflag.StringVar(&config.SpaceReplacement, "space-replace", "_", "Replace spaces in filenames with this string (default: _)")
+	pflag.StringVar(&config.SpaceReplacement, "space-replace", "", "Replace spaces in filenames (default: _ when flag is used)")
+	pflag.BoolVar(&config.NoOriginalName, "no-original-name", false, "Discard original filename, use only timestamp and dimension")
 
 	configFile := pflag.String("config", "", "Path to configuration file (YAML/JSON)")
-	
+
+	// Set NoOptDefVal so --space-replace without value uses "_"
+	pflag.Lookup("space-replace").NoOptDefVal = "_"
+
 	pflag.Parse()
 
 	// Read from config file first if provided
@@ -154,10 +159,6 @@ func LoadConfig() (*Config, error) {
 
 	if pflag.Lookup("scheme").Changed {
 		config.OrganizationScheme = OrganizationScheme(schemeFlag)
-	}
-
-	if !pflag.Lookup("space-replace").Changed && config.SpaceReplacement == "" {
-		config.SpaceReplacement = "_"
 	}
 
 	// Validate config

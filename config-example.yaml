@@ -26,9 +26,12 @@ organization_scheme: extension_first
 # When using date_first, all media types go to this single directory
 # destination: /path/to/unified/output
 
-# Replace spaces in filenames with this string (default: _)
-# Set to empty string to keep spaces, or use custom character like "-"
-space_replacement: "_"
+# Replace spaces in filenames with this string
+# Omit or leave empty to keep spaces, use "_" for underscores, "-" for hyphens
+# space_replacement: "_"
+
+# Discard original filename, use only timestamp and dimension
+# no_original_name: false
 
 # Dry run mode - set to true to simulate without moving files
 dry_run: false

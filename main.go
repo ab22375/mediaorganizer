@@ -74,7 +74,7 @@ func main() {
 
 	// Create and start scanner
 	logrus.Debugf("Creating scanner...")
-	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.Destination, cfg.DestDirs, cfg.ExtensionDirs, string(cfg.OrganizationScheme), cfg.SpaceReplacement, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
+	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.Destination, cfg.DestDirs, cfg.ExtensionDirs, string(cfg.OrganizationScheme), cfg.SpaceReplacement, cfg.NoOriginalName, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
 	
 	logrus.Infof("Starting scan with %d concurrent workers...", cfg.ConcurrentJobs)
 	startTime := time.Now()

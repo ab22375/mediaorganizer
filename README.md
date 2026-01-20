@@ -82,8 +82,14 @@ go build
 # Use date_first organization scheme with unified destination
 ./mediaorganizer --source /path/to/media/files --scheme date_first --dest /path/to/output
 
-# Replace spaces in filenames with hyphens instead of underscores
-./mediaorganizer --source /path/to/media/files --space-replace "-"
+# Replace spaces in filenames with underscores
+./mediaorganizer --source /path/to/media/files --space-replace
+
+# Replace spaces with custom character (hyphen)
+./mediaorganizer --source /path/to/media/files --space-replace="-"
+
+# Discard original filename, use only timestamp and dimension
+./mediaorganizer --source /path/to/media/files --no-original-name
 ```
 
 ## Configuration File

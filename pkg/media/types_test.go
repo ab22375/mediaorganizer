@@ -267,7 +267,7 @@ func TestGetNewFilename_ExtensionFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.media.GetNewFilename("extension_first", "_")
+			result := tt.media.GetNewFilename("extension_first", "_", false)
 			if result != tt.expected {
 				t.Errorf("GetNewFilename() = %v, want %v", result, tt.expected)
 			}
@@ -340,7 +340,7 @@ func TestGetNewFilename_DateFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.media.GetNewFilename("date_first", "_")
+			result := tt.media.GetNewFilename("date_first", "_", false)
 			if result != tt.expected {
 				t.Errorf("GetNewFilename() = %v, want %v", result, tt.expected)
 			}
@@ -448,7 +448,63 @@ func TestGetNewFilename_SpaceReplacement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.media.GetNewFilename(tt.scheme, tt.spaceReplacement)
+			result := tt.media.GetNewFilename(tt.scheme, tt.spaceReplacement, false)
+			if result != tt.expected {
+				t.Errorf("GetNewFilename() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetNewFilename_NoOriginalName(t *testing.T) {
+	creationTime := time.Date(2025, 11, 23, 10, 36, 22, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		media    *MediaFile
+		scheme   string
+		expected string
+	}{
+		{
+			name: "date_first - image with dimension, no original name",
+			media: &MediaFile{
+				SourcePath:      "/source/My Photo.jpeg",
+				Type:            TypeImage,
+				CreationTime:    creationTime,
+				LargerDimension: 3264,
+				OriginalName:    "My Photo.jpeg",
+			},
+			scheme:   "date_first",
+			expected: "20251123-103622_3264.jpeg",
+		},
+		{
+			name: "date_first - video, no original name",
+			media: &MediaFile{
+				SourcePath:   "/source/My Video.mp4",
+				Type:         TypeVideo,
+				CreationTime: creationTime,
+				OriginalName: "My Video.mp4",
+			},
+			scheme:   "date_first",
+			expected: "20251123-103622.mp4",
+		},
+		{
+			name: "extension_first - image with dimension, no original name",
+			media: &MediaFile{
+				SourcePath:      "/source/My Photo.jpeg",
+				Type:            TypeImage,
+				CreationTime:    creationTime,
+				LargerDimension: 3264,
+				OriginalName:    "My Photo.jpeg",
+			},
+			scheme:   "extension_first",
+			expected: "20251123-103622_3264.jpeg",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.media.GetNewFilename(tt.scheme, "_", true)
 			if result != tt.expected {
 				t.Errorf("GetNewFilename() = %v, want %v", result, tt.expected)
 			}
