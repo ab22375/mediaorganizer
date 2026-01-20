@@ -10,12 +10,21 @@ destinations:
   audio: /path/to/organized/audio
 
 # Extension-specific destination directories (optional)
-# If specified, files with matching extensions will be organized under these paths 
+# If specified, files with matching extensions will be organized under these paths
 # instead of the default media type path
 # For example:
 # extension_destinations:
 #   jpg: /path/to/specific/jpg/photos
 #   mp4: /path/to/specific/mp4/videos
+
+# Organization scheme (optional)
+# - extension_first (default): uses destinations map, <dest>/<ext>/YYYY/YYYY-MM/YYYY-MM-DD/filename
+# - date_first: uses unified destination, <dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>/filename
+organization_scheme: extension_first
+
+# Unified destination directory (used with date_first scheme)
+# When using date_first, all media types go to this single directory
+# destination: /path/to/unified/output
 
 # Dry run mode - set to true to simulate without moving files
 dry_run: false

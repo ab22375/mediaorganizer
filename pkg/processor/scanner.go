@@ -29,8 +29,10 @@ type ScanResult struct {
 
 type MediaScanner struct {
 	sourceDir        string
+	destination      string            // Unified destination for date_first scheme
 	destinationDirs  map[string]string
 	extensionDirs    map[string]string
+	scheme           string
 	dryRun           bool
 	copyFiles        bool
 	deleteEmptyDirs  bool
@@ -43,11 +45,13 @@ type MediaScanner struct {
 	processed        int32 // Atomic counter for progress reporting
 }
 
-func NewMediaScanner(sourceDir string, destDirs map[string]string, extensionDirs map[string]string, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
+func NewMediaScanner(sourceDir string, destination string, destDirs map[string]string, extensionDirs map[string]string, scheme string, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
 	return &MediaScanner{
 		sourceDir:       sourceDir,
+		destination:     destination,
 		destinationDirs: destDirs,
 		extensionDirs:   extensionDirs,
+		scheme:          scheme,
 		dryRun:          dryRun,
 		copyFiles:       copyFiles,
 		deleteEmptyDirs: deleteEmptyDirs,
@@ -172,11 +176,18 @@ func (s *MediaScanner) organizeFiles() {
 				ext = ext[1:] // Remove the leading dot
 			}
 			
-			// Get base destination directory for this media type
-			baseDestDir := s.destinationDirs[string(file.Type)]
-			if baseDestDir == "" {
-				logrus.Warnf("No destination directory configured for media type: %s", file.Type)
-				continue
+			// Get base destination directory
+			var baseDestDir string
+			if s.scheme == "date_first" && s.destination != "" {
+				// Use unified destination for date_first scheme
+				baseDestDir = s.destination
+			} else {
+				// Use media-type-specific destination
+				baseDestDir = s.destinationDirs[string(file.Type)]
+				if baseDestDir == "" {
+					logrus.Warnf("No destination directory configured for media type: %s", file.Type)
+					continue
+				}
 			}
 			
 			// Try to get extension-specific directory
@@ -188,8 +199,8 @@ func (s *MediaScanner) organizeFiles() {
 			// Consider files with i > 0 as duplicates
 			isDuplicate := i > 0
 			
-			fileDir := file.GetDestinationPath(baseDestDir, extensionDir, isDuplicate)
-			fileName := file.GetNewFilename()
+			fileDir := file.GetDestinationPath(baseDestDir, extensionDir, isDuplicate, s.scheme)
+			fileName := file.GetNewFilename(s.scheme)
 			
 			// Add sequence if multiple files with same timestamp
 			if sequenceNum != "" {

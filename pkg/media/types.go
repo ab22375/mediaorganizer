@@ -30,43 +30,48 @@ func (m *MediaFile) GetExtension() string {
 	return strings.TrimPrefix(strings.ToLower(filepath.Ext(m.SourcePath)), ".")
 }
 
-func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDuplicate bool) string {
+func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDuplicate bool, scheme string) string {
 	year := m.CreationTime.Format("2006")
 	month := m.CreationTime.Format("01")
 	day := m.CreationTime.Format("02")
-	
-	// If extension-specific directory is provided, use it
-	// Otherwise, use the extension as a subdirectory under baseDir
-	destPath := baseDir
+	ext := m.GetExtension()
+
+	var destPath string
+
 	if extensionDir != "" {
-		// Use the extension-specific directory
+		// Use the extension-specific directory (scheme doesn't apply here)
 		destPath = extensionDir
+		// For duplicates, add a "duplicates" subfolder
+		if isDuplicate {
+			destPath = filepath.Join(destPath, "duplicates")
+		}
+		// Add date-based directory structure
+		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
+	} else if scheme == "date_first" {
+		// date_first: <dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>
+		destPath = baseDir
+		// For duplicates, add a "duplicates" subfolder
+		if isDuplicate {
+			destPath = filepath.Join(destPath, "duplicates")
+		}
+		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day), ext)
 	} else {
-		// Use the extension as a subdirectory under the media type directory
-		ext := m.GetExtension()
+		// extension_first (default): <dest>/<ext>/YYYY/YYYY-MM/YYYY-MM-DD
 		destPath = filepath.Join(baseDir, ext)
+		// For duplicates, add a "duplicates" subfolder
+		if isDuplicate {
+			destPath = filepath.Join(destPath, "duplicates")
+		}
+		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
 	}
-	
-	// For duplicates, add a "duplicates" subfolder
-	if isDuplicate {
-		destPath = filepath.Join(destPath, "duplicates")
-	}
-	
-	// Add date-based directory structure
-	destDir := filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
-	
-	return destDir
+
+	return destPath
 }
 
-func (m *MediaFile) GetNewFilename() string {
+func (m *MediaFile) GetNewFilename(scheme string) string {
 	ext := strings.ToLower(filepath.Ext(m.SourcePath))
 	timestamp := m.CreationTime.Format("20060102-150405")
-	
-	dimension := ""
-	if m.LargerDimension > 0 {
-		dimension = fmt.Sprintf("_%d", m.LargerDimension)
-	}
-	
+
 	// Get original name without extension for suffix
 	origNameWithoutExt := m.OriginalName
 	if len(origNameWithoutExt) > 0 {
@@ -78,18 +83,38 @@ func (m *MediaFile) GetNewFilename() string {
 			}
 			origNameWithoutExt = strings.TrimSuffix(origNameWithoutExt, fileExt)
 		}
-		
-		// Check if the original filename already matches our format (YYYYMMDD-HHMMSS)
-		// If it does, don't add it in parentheses
-		if !strings.HasPrefix(origNameWithoutExt, timestamp) {
-			// Add parentheses around the original name
-			origNameWithoutExt = " (" + origNameWithoutExt + ")"
-		} else {
-			origNameWithoutExt = ""
-		}
 	}
-	
-	return fmt.Sprintf("%s%s%s%s", timestamp, dimension, origNameWithoutExt, ext)
+
+	if scheme == "date_first" {
+		// date_first scheme: YYYYMMDD-HHMMSS_dim_name.ext (images) or YYYYMMDD-HHMMSS_name.ext (video/audio)
+		dimension := ""
+		if m.LargerDimension > 0 && m.Type == TypeImage {
+			dimension = fmt.Sprintf("_%d", m.LargerDimension)
+		}
+
+		// Skip original name if it matches the timestamp format
+		namePart := ""
+		if origNameWithoutExt != "" && !strings.HasPrefix(origNameWithoutExt, timestamp) {
+			namePart = "_" + origNameWithoutExt
+		}
+
+		return fmt.Sprintf("%s%s%s%s", timestamp, dimension, namePart, ext)
+	}
+
+	// extension_first scheme (default): YYYYMMDD-HHMMSS_dim (name).ext
+	dimension := ""
+	if m.LargerDimension > 0 {
+		dimension = fmt.Sprintf("_%d", m.LargerDimension)
+	}
+
+	// Check if the original filename already matches our format (YYYYMMDD-HHMMSS)
+	// If it does, don't add it in parentheses
+	namePart := ""
+	if origNameWithoutExt != "" && !strings.HasPrefix(origNameWithoutExt, timestamp) {
+		namePart = " (" + origNameWithoutExt + ")"
+	}
+
+	return fmt.Sprintf("%s%s%s%s", timestamp, dimension, namePart, ext)
 }
 
 func DetermineMediaType(filePath string) MediaType {

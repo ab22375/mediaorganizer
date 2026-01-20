@@ -12,16 +12,41 @@ import (
 	"github.com/spf13/viper"
 )
 
+// OrganizationScheme defines how files are organized in the destination
+type OrganizationScheme string
+
+const (
+	// SchemeExtensionFirst organizes as: <dest>/<ext>/YYYY/YYYY-MM/YYYY-MM-DD/filename
+	SchemeExtensionFirst OrganizationScheme = "extension_first"
+	// SchemeDateFirst organizes as: <dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>/filename
+	SchemeDateFirst OrganizationScheme = "date_first"
+)
+
+// ValidSchemes contains all valid organization scheme values
+var ValidSchemes = []OrganizationScheme{SchemeExtensionFirst, SchemeDateFirst}
+
+// IsValidScheme checks if the given scheme is valid
+func IsValidScheme(scheme string) bool {
+	for _, valid := range ValidSchemes {
+		if string(valid) == scheme {
+			return true
+		}
+	}
+	return false
+}
+
 type Config struct {
-	SourceDir       string                       `mapstructure:"source"`
-	DestDirs        map[string]string            `mapstructure:"destinations"`
-	ExtensionDirs   map[string]string            `mapstructure:"extension_destinations"`
-	DryRun          bool                         `mapstructure:"dry_run"`
-	Verbose         bool                         `mapstructure:"verbose"`
-	LogFile         string                       `mapstructure:"log_file"`
-	ConcurrentJobs  int                          `mapstructure:"concurrent_jobs"`
-	CopyFiles       bool                         `mapstructure:"copy_files"`
-	DeleteEmptyDirs bool                         `mapstructure:"delete_empty_dirs"`
+	SourceDir          string                       `mapstructure:"source"`
+	Destination        string                       `mapstructure:"destination"`
+	DestDirs           map[string]string            `mapstructure:"destinations"`
+	ExtensionDirs      map[string]string            `mapstructure:"extension_destinations"`
+	OrganizationScheme OrganizationScheme           `mapstructure:"organization_scheme"`
+	DryRun             bool                         `mapstructure:"dry_run"`
+	Verbose            bool                         `mapstructure:"verbose"`
+	LogFile            string                       `mapstructure:"log_file"`
+	ConcurrentJobs     int                          `mapstructure:"concurrent_jobs"`
+	CopyFiles          bool                         `mapstructure:"copy_files"`
+	DeleteEmptyDirs    bool                         `mapstructure:"delete_empty_dirs"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -32,17 +57,20 @@ func LoadConfig() (*Config, error) {
 			"video": "./output/videos",
 			"audio": "./output/audio",
 		},
-		ExtensionDirs: make(map[string]string),
-		ConcurrentJobs: 4,
+		ExtensionDirs:      make(map[string]string),
+		OrganizationScheme: SchemeExtensionFirst,
+		ConcurrentJobs:     4,
 	}
 
 	// Set up command line flags
 	pflag.StringVarP(&config.SourceDir, "source", "s", "", "Source directory to scan for media files")
 	
 	// Define variables to hold command line values
-	var imageDestFlag, videoDestFlag, audioDestFlag string
-	
+	var destFlag, imageDestFlag, videoDestFlag, audioDestFlag string
+	var schemeFlag string
+
 	// Define flags with default values
+	pflag.StringVar(&destFlag, "dest", "", "Unified destination directory (used with date_first scheme)")
 	pflag.StringVar(&imageDestFlag, "image-dest", config.DestDirs["image"], "Destination directory for images")
 	pflag.StringVar(&videoDestFlag, "video-dest", config.DestDirs["video"], "Destination directory for videos")
 	pflag.StringVar(&audioDestFlag, "audio-dest", config.DestDirs["audio"], "Destination directory for audio files")
@@ -53,6 +81,7 @@ func LoadConfig() (*Config, error) {
 	pflag.BoolVar(&config.DeleteEmptyDirs, "delete-empty-dirs", false, "Delete empty folders in source directory after moving files")
 	pflag.StringVarP(&config.LogFile, "log-file", "l", "", "Log file path")
 	pflag.IntVarP(&config.ConcurrentJobs, "jobs", "j", config.ConcurrentJobs, "Number of concurrent processing jobs")
+	pflag.StringVar(&schemeFlag, "scheme", string(config.OrganizationScheme), "Organization scheme: extension_first (default) or date_first")
 
 	configFile := pflag.String("config", "", "Path to configuration file (YAML/JSON)")
 	
@@ -77,7 +106,11 @@ func LoadConfig() (*Config, error) {
 	if pflag.Lookup("source").Changed {
 		config.SourceDir = pflag.Lookup("source").Value.String()
 	}
-	
+
+	if pflag.Lookup("dest").Changed {
+		config.Destination = destFlag
+	}
+
 	if pflag.Lookup("image-dest").Changed {
 		config.DestDirs["image"] = imageDestFlag
 	}
@@ -117,9 +150,17 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	if pflag.Lookup("scheme").Changed {
+		config.OrganizationScheme = OrganizationScheme(schemeFlag)
+	}
+
 	// Validate config
 	if config.SourceDir == "" {
 		return nil, &ConfigError{"source directory is required"}
+	}
+
+	if !IsValidScheme(string(config.OrganizationScheme)) {
+		return nil, &ConfigError{fmt.Sprintf("invalid organization scheme: %s (valid: extension_first, date_first)", config.OrganizationScheme)}
 	}
 
 	// Convert relative paths to absolute paths
@@ -127,6 +168,14 @@ func LoadConfig() (*Config, error) {
 	config.SourceDir, err = filepath.Abs(config.SourceDir)
 	if err != nil {
 		return nil, err
+	}
+
+	if config.Destination != "" {
+		config.Destination, err = filepath.Abs(config.Destination)
+		if err != nil {
+			return nil, err
+		}
+		logrus.Debugf("Final unified destination path: %s", config.Destination)
 	}
 
 	for mediaType, destDir := range config.DestDirs {

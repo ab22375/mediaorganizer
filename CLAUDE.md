@@ -46,7 +46,15 @@ Media Organizer is a Go utility that organizes media files (images, videos, audi
 
 ### Output Structure
 
-Files are organized as: `<dest>/<extension>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> (<original_name>).<ext>`
+The output structure depends on the selected organization scheme (`--scheme` flag or `organization_scheme` config):
+
+**extension_first (default):**
+Uses per-media-type destinations (`--image-dest`, `--video-dest`, `--audio-dest`):
+`<dest>/<extension>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> (<original_name>).<ext>`
+
+**date_first:**
+Uses a unified destination (`--dest`), all media types in one directory:
+`<dest>/YYYY/YYYY-MM/YYYY-MM-DD/<extension>/YYYYMMDD-HHMMSS_<dimension>_<original_name>.<ext>`
 
 Duplicates (same timestamp) get sequence suffixes (`_001`, `_002`) and can be routed to a `duplicates/` subfolder.
 

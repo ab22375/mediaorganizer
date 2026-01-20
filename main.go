@@ -35,6 +35,7 @@ func main() {
 	logrus.Debugf("Verbose: %v", cfg.Verbose)
 	logrus.Debugf("Log file: %s", cfg.LogFile)
 	logrus.Debugf("Concurrent jobs: %d", cfg.ConcurrentJobs)
+	logrus.Debugf("Organization scheme: %s", cfg.OrganizationScheme)
 
 	// Check if the source directory exists
 	logrus.Debugf("Checking if source directory exists...")
@@ -47,8 +48,13 @@ func main() {
 	// Print configuration
 	logrus.Infof("Media Organizer")
 	logrus.Infof("Source directory: %s", cfg.SourceDir)
-	for mediaType, destDir := range cfg.DestDirs {
-		logrus.Infof("Destination for %s: %s", mediaType, destDir)
+	logrus.Infof("Organization scheme: %s", cfg.OrganizationScheme)
+	if cfg.OrganizationScheme == config.SchemeDateFirst && cfg.Destination != "" {
+		logrus.Infof("Destination: %s", cfg.Destination)
+	} else {
+		for mediaType, destDir := range cfg.DestDirs {
+			logrus.Infof("Destination for %s: %s", mediaType, destDir)
+		}
 	}
 	for extension, destDir := range cfg.ExtensionDirs {
 		logrus.Infof("Destination for extension .%s: %s", extension, destDir)
@@ -68,7 +74,7 @@ func main() {
 
 	// Create and start scanner
 	logrus.Debugf("Creating scanner...")
-	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.DestDirs, cfg.ExtensionDirs, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
+	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.Destination, cfg.DestDirs, cfg.ExtensionDirs, string(cfg.OrganizationScheme), cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
 	
 	logrus.Infof("Starting scan with %d concurrent workers...", cfg.ConcurrentJobs)
 	startTime := time.Now()

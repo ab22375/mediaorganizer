@@ -78,6 +78,9 @@ go build
 
 # Delete empty directories after moving files
 ./mediaorganizer --source /path/to/media/files --delete-empty-dirs
+
+# Use date_first organization scheme with unified destination
+./mediaorganizer --source /path/to/media/files --scheme date_first --dest /path/to/output
 ```
 
 ## Configuration File
@@ -107,39 +110,49 @@ concurrent_jobs: 8
 delete_empty_dirs: false
 ```
 
-## Output Directory Structure
+## Organization Schemes
 
-The program organizes files into the following structure:
+The program supports two organization schemes that determine how files are structured in the destination:
 
-### Default Structure (by Media Type)
+### Extension First (default)
 
-```
-<destination>/<mediatype>/<extension>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> <original_name>.<ext>
-```
-
-For example:
-```
-/output/images/jpg/2023/2023-05/2023-05-20/20230520-143015_4032 IMG_1234.jpg
-/output/videos/mp4/2022/2022-12/2022-12-25/20221225-103045_1920 VID_5678.mp4
-```
-
-### Custom Extension-Specific Paths
-
-If extension-specific destinations are defined in the configuration, files will be organized:
+Files are organized with the extension/media type directory before the date structure:
 
 ```
-<extension_destination>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> <original_name>.<ext>
+<destination>/<extension>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> (<original_name>).<ext>
 ```
 
-For example, with the following configuration:
+Example:
+```
+/output/images/jpeg/2025/2025-11/2025-11-23/20251123-103622_3264 (IMG01).jpeg
+/output/videos/mov/2025/2025-11/2025-11-23/20251123-090020 (movie2).mov
+```
+
+### Date First
+
+Files are organized with the date structure before the extension directory. All media types go to a single unified destination:
+
+```
+<destination>/YYYY/YYYY-MM/YYYY-MM-DD/<extension>/YYYYMMDD-HHMMSS_<dimension>_<original_name>.<ext>
+```
+
+Example (all files in one `/output` directory):
+```
+/output/2025/2025-11/2025-11-23/jpeg/20251123-103622_3264_IMG01.jpeg
+/output/2025/2025-11/2025-11-23/mov/20251123-090020_movie2.mov
+/output/2025/2025-11/2025-11-23/mp3/20251123-143000_song.mp3
+```
+
+To use the date_first scheme, use the `--scheme` and `--dest` flags:
+
+```bash
+./mediaorganizer --source /path/to/media/files --scheme date_first --dest /path/to/output
+```
+
+Or in config.yaml:
 ```yaml
-extension_destinations:
-  jpg: /path/to/custom/jpeg/photos
-```
-
-The output would be:
-```
-/path/to/custom/jpeg/photos/2023/2023-05/2023-05-20/20230520-143015_4032 IMG_1234.jpg
+organization_scheme: date_first
+destination: /path/to/output
 ```
 
 ## Requirements
