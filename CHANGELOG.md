@@ -10,7 +10,8 @@ All notable changes to this project will be documented in this file.
   - `date_first`: `<dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>/`
 - **Unified destination** (`--dest` flag): Single output directory for `date_first` scheme
 - **`--scheme` flag**: Select organization scheme from CLI
-- **Config options**: `organization_scheme` and `destination` in YAML/JSON config
+- **`--space-replace` flag**: Replace spaces in filenames (default: `_`)
+- **Config options**: `organization_scheme`, `destination`, `space_replacement` in YAML/JSON config
 - Unit tests for organization schemes in `pkg/media/types_test.go`
 - Unit tests for scheme validation in `pkg/config/config_test.go`
 

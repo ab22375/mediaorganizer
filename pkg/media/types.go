@@ -68,7 +68,7 @@ func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDu
 	return destPath
 }
 
-func (m *MediaFile) GetNewFilename(scheme string) string {
+func (m *MediaFile) GetNewFilename(scheme string, spaceReplacement string) string {
 	ext := strings.ToLower(filepath.Ext(m.SourcePath))
 	timestamp := m.CreationTime.Format("20060102-150405")
 
@@ -83,6 +83,11 @@ func (m *MediaFile) GetNewFilename(scheme string) string {
 			}
 			origNameWithoutExt = strings.TrimSuffix(origNameWithoutExt, fileExt)
 		}
+	}
+
+	// Replace spaces in the original name
+	if spaceReplacement != "" && spaceReplacement != " " {
+		origNameWithoutExt = strings.ReplaceAll(origNameWithoutExt, " ", spaceReplacement)
 	}
 
 	if scheme == "date_first" {

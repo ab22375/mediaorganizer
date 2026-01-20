@@ -267,7 +267,7 @@ func TestGetNewFilename_ExtensionFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.media.GetNewFilename("extension_first")
+			result := tt.media.GetNewFilename("extension_first", "_")
 			if result != tt.expected {
 				t.Errorf("GetNewFilename() = %v, want %v", result, tt.expected)
 			}
@@ -340,7 +340,7 @@ func TestGetNewFilename_DateFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.media.GetNewFilename("date_first")
+			result := tt.media.GetNewFilename("date_first", "_")
 			if result != tt.expected {
 				t.Errorf("GetNewFilename() = %v, want %v", result, tt.expected)
 			}
@@ -368,6 +368,89 @@ func TestGetExtension(t *testing.T) {
 			result := m.GetExtension()
 			if result != tt.expected {
 				t.Errorf("GetExtension() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetNewFilename_SpaceReplacement(t *testing.T) {
+	creationTime := time.Date(2025, 11, 23, 10, 36, 22, 0, time.UTC)
+
+	tests := []struct {
+		name             string
+		media            *MediaFile
+		scheme           string
+		spaceReplacement string
+		expected         string
+	}{
+		{
+			name: "Replace spaces with underscore (default)",
+			media: &MediaFile{
+				SourcePath:   "/source/My Photo File.jpeg",
+				Type:         TypeImage,
+				CreationTime: creationTime,
+				OriginalName: "My Photo File.jpeg",
+			},
+			scheme:           "date_first",
+			spaceReplacement: "_",
+			expected:         "20251123-103622_My_Photo_File.jpeg",
+		},
+		{
+			name: "Replace spaces with hyphen",
+			media: &MediaFile{
+				SourcePath:   "/source/My Photo File.jpeg",
+				Type:         TypeImage,
+				CreationTime: creationTime,
+				OriginalName: "My Photo File.jpeg",
+			},
+			scheme:           "date_first",
+			spaceReplacement: "-",
+			expected:         "20251123-103622_My-Photo-File.jpeg",
+		},
+		{
+			name: "Remove spaces (empty replacement)",
+			media: &MediaFile{
+				SourcePath:   "/source/My Photo File.jpeg",
+				Type:         TypeImage,
+				CreationTime: creationTime,
+				OriginalName: "My Photo File.jpeg",
+			},
+			scheme:           "date_first",
+			spaceReplacement: "",
+			expected:         "20251123-103622_My Photo File.jpeg",
+		},
+		{
+			name: "Keep spaces (space replacement)",
+			media: &MediaFile{
+				SourcePath:   "/source/My Photo File.jpeg",
+				Type:         TypeImage,
+				CreationTime: creationTime,
+				OriginalName: "My Photo File.jpeg",
+			},
+			scheme:           "date_first",
+			spaceReplacement: " ",
+			expected:         "20251123-103622_My Photo File.jpeg",
+		},
+		{
+			name: "Extension first with space replacement",
+			media: &MediaFile{
+				SourcePath:      "/source/My Photo.jpeg",
+				Type:            TypeImage,
+				CreationTime:    creationTime,
+				LargerDimension: 3264,
+				OriginalName:    "My Photo.jpeg",
+			},
+			scheme:           "extension_first",
+			spaceReplacement: "_",
+			expected:         "20251123-103622_3264 (My_Photo).jpeg",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.media.GetNewFilename(tt.scheme, tt.spaceReplacement)
+			if result != tt.expected {
+				t.Errorf("GetNewFilename() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

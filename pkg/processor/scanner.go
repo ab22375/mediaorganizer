@@ -33,6 +33,7 @@ type MediaScanner struct {
 	destinationDirs  map[string]string
 	extensionDirs    map[string]string
 	scheme           string
+	spaceReplacement string
 	dryRun           bool
 	copyFiles        bool
 	deleteEmptyDirs  bool
@@ -45,19 +46,20 @@ type MediaScanner struct {
 	processed        int32 // Atomic counter for progress reporting
 }
 
-func NewMediaScanner(sourceDir string, destination string, destDirs map[string]string, extensionDirs map[string]string, scheme string, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
+func NewMediaScanner(sourceDir string, destination string, destDirs map[string]string, extensionDirs map[string]string, scheme string, spaceReplacement string, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
 	return &MediaScanner{
-		sourceDir:       sourceDir,
-		destination:     destination,
-		destinationDirs: destDirs,
-		extensionDirs:   extensionDirs,
-		scheme:          scheme,
-		dryRun:          dryRun,
-		copyFiles:       copyFiles,
-		deleteEmptyDirs: deleteEmptyDirs,
-		concurrency:     concurrency,
-		processingQueue: make(chan string, 100),
-		mediaMap:        make(map[string][]*media.MediaFile),
+		sourceDir:        sourceDir,
+		destination:      destination,
+		destinationDirs:  destDirs,
+		extensionDirs:    extensionDirs,
+		scheme:           scheme,
+		spaceReplacement: spaceReplacement,
+		dryRun:           dryRun,
+		copyFiles:        copyFiles,
+		deleteEmptyDirs:  deleteEmptyDirs,
+		concurrency:      concurrency,
+		processingQueue:  make(chan string, 100),
+		mediaMap:         make(map[string][]*media.MediaFile),
 		result: ScanResult{
 			StartTime: time.Now(),
 		},
@@ -200,7 +202,7 @@ func (s *MediaScanner) organizeFiles() {
 			isDuplicate := i > 0
 			
 			fileDir := file.GetDestinationPath(baseDestDir, extensionDir, isDuplicate, s.scheme)
-			fileName := file.GetNewFilename(s.scheme)
+			fileName := file.GetNewFilename(s.scheme, s.spaceReplacement)
 			
 			// Add sequence if multiple files with same timestamp
 			if sequenceNum != "" {
