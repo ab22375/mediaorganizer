@@ -13,14 +13,15 @@ import (
 )
 
 type Config struct {
-	SourceDir       string            `mapstructure:"source"`
-	DestDirs        map[string]string `mapstructure:"destinations"`
-	DryRun          bool              `mapstructure:"dry_run"`
-	Verbose         bool              `mapstructure:"verbose"`
-	LogFile         string            `mapstructure:"log_file"`
-	ConcurrentJobs  int               `mapstructure:"concurrent_jobs"`
-	CopyFiles       bool              `mapstructure:"copy_files"`
-	DeleteEmptyDirs bool              `mapstructure:"delete_empty_dirs"`
+	SourceDir       string                       `mapstructure:"source"`
+	DestDirs        map[string]string            `mapstructure:"destinations"`
+	ExtensionDirs   map[string]string            `mapstructure:"extension_destinations"`
+	DryRun          bool                         `mapstructure:"dry_run"`
+	Verbose         bool                         `mapstructure:"verbose"`
+	LogFile         string                       `mapstructure:"log_file"`
+	ConcurrentJobs  int                          `mapstructure:"concurrent_jobs"`
+	CopyFiles       bool                         `mapstructure:"copy_files"`
+	DeleteEmptyDirs bool                         `mapstructure:"delete_empty_dirs"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -31,6 +32,7 @@ func LoadConfig() (*Config, error) {
 			"video": "./output/videos",
 			"audio": "./output/audio",
 		},
+		ExtensionDirs: make(map[string]string),
 		ConcurrentJobs: 4,
 	}
 

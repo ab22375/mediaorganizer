@@ -1,0 +1,45 @@
+# Media Organizer Configuration File with Extension-Specific Paths
+
+# Source directory to scan for media files
+source: /path/to/your/media/files
+
+# Destination directories for each media type
+destinations:
+  image: /path/to/organized/images
+  video: /path/to/organized/videos
+  audio: /path/to/organized/audio
+
+# Extension-specific destination directories
+# If specified, these override the default media type destinations
+# If not specified for an extension, the file will be organized under 
+# /path/to/organized/[media_type]/[extension]/YYYY/YYYY-MM/YYYY-MM-DD
+extension_destinations:
+  # Image extensions with custom paths
+  jpg: /path/to/custom/jpeg/photos
+  jpeg: /path/to/custom/jpeg/photos
+  png: /path/to/custom/png/graphics
+  
+  # Video extensions with custom paths
+  mp4: /path/to/custom/mp4/videos
+  
+  # Audio extensions with custom paths
+  mp3: /path/to/custom/mp3/music
+  flac: /path/to/custom/flac/lossless
+
+# Dry run mode - set to true to simulate without moving files
+dry_run: false
+
+# Copy files instead of moving them
+copy_files: false
+
+# Delete empty directories after moving files (only applies when move is used, not copy)
+delete_empty_dirs: false
+
+# Verbose logging
+verbose: true
+
+# Log file path (optional)
+log_file: organizer.log
+
+# Number of concurrent processing jobs
+concurrent_jobs: 4

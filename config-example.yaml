@@ -9,6 +9,14 @@ destinations:
   video: /path/to/organized/videos
   audio: /path/to/organized/audio
 
+# Extension-specific destination directories (optional)
+# If specified, files with matching extensions will be organized under these paths 
+# instead of the default media type path
+# For example:
+# extension_destinations:
+#   jpg: /path/to/specific/jpg/photos
+#   mp4: /path/to/specific/mp4/videos
+
 # Dry run mode - set to true to simulate without moving files
 dry_run: false
 

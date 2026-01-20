@@ -50,6 +50,9 @@ func main() {
 	for mediaType, destDir := range cfg.DestDirs {
 		logrus.Infof("Destination for %s: %s", mediaType, destDir)
 	}
+	for extension, destDir := range cfg.ExtensionDirs {
+		logrus.Infof("Destination for extension .%s: %s", extension, destDir)
+	}
 	if cfg.DryRun {
 		logrus.Infof("Running in DRY-RUN mode (no files will be moved/copied)")
 	} else {
@@ -65,7 +68,7 @@ func main() {
 
 	// Create and start scanner
 	logrus.Debugf("Creating scanner...")
-	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.DestDirs, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
+	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.DestDirs, cfg.ExtensionDirs, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
 	
 	logrus.Infof("Starting scan with %d concurrent workers...", cfg.ConcurrentJobs)
 	startTime := time.Now()

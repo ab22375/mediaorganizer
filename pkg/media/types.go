@@ -26,14 +26,34 @@ type MediaFile struct {
 	OriginalName    string
 }
 
-func (m *MediaFile) GetDestinationPath(baseDir string) string {
+func (m *MediaFile) GetExtension() string {
+	return strings.TrimPrefix(strings.ToLower(filepath.Ext(m.SourcePath)), ".")
+}
+
+func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDuplicate bool) string {
 	year := m.CreationTime.Format("2006")
 	month := m.CreationTime.Format("01")
 	day := m.CreationTime.Format("02")
 	
-	// Using the baseDir directly without adding the media type again
-	// Since the baseDir already includes the media type-specific path
-	destDir := filepath.Join(baseDir, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
+	// If extension-specific directory is provided, use it
+	// Otherwise, use the extension as a subdirectory under baseDir
+	destPath := baseDir
+	if extensionDir != "" {
+		// Use the extension-specific directory
+		destPath = extensionDir
+	} else {
+		// Use the extension as a subdirectory under the media type directory
+		ext := m.GetExtension()
+		destPath = filepath.Join(baseDir, ext)
+	}
+	
+	// For duplicates, add a "duplicates" subfolder
+	if isDuplicate {
+		destPath = filepath.Join(destPath, "duplicates")
+	}
+	
+	// Add date-based directory structure
+	destDir := filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
 	
 	return destDir
 }
@@ -78,7 +98,7 @@ func DetermineMediaType(filePath string) MediaType {
 	switch ext {
 	case ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".nef", ".arw", ".cr2", ".cr3", ".dng", ".heic", ".raf":
 		return TypeImage
-	case ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm", ".m4v", ".mpeg", ".mpg", ".3gp", ".asf", ".m2v", ".vob":
+	case ".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm", ".m4v", ".mpeg", ".mpg", ".3gp", ".asf", ".m2v", ".vob", ".m2t", ".mts":
 		return TypeVideo
 	case ".mp3", ".wav", ".aac", ".ogg", ".flac", ".m4a", ".wma", ".amr":
 		return TypeAudio

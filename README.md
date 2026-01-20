@@ -9,6 +9,7 @@ A Golang utility for organizing media files (images, videos, audio) by creation 
 - Organizes files into a structured directory hierarchy based on dates
 - Renames files with creation timestamp and resolution information
 - Handles duplicate files with sequence numbering
+- Extension-specific organization (organize by file extension or specify custom paths for specific extensions)
 - Configurable via command line flags or configuration file
 - Support for dry-run mode to preview changes
 - Concurrent processing for improved performance
@@ -90,6 +91,14 @@ destinations:
   image: /path/to/organized/images
   video: /path/to/organized/videos
   audio: /path/to/organized/audio
+
+# Optional: Custom paths for specific file extensions
+extension_destinations:
+  jpg: /path/to/custom/jpeg/photos
+  png: /path/to/custom/png/graphics
+  mp4: /path/to/custom/mp4/videos
+  mp3: /path/to/custom/mp3/music
+
 dry_run: false
 copy_files: false
 verbose: true
@@ -102,14 +111,35 @@ delete_empty_dirs: false
 
 The program organizes files into the following structure:
 
+### Default Structure (by Media Type)
+
 ```
-<destination>/<mediatype>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> <original_name>.<ext>
+<destination>/<mediatype>/<extension>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> <original_name>.<ext>
 ```
 
 For example:
 ```
-/output/images/2023/2023-05/2023-05-20/20230520-143015_4032 IMG_1234.jpg
-/output/videos/2022/2022-12/2022-12-25/20221225-103045_1920 VID_5678.mp4
+/output/images/jpg/2023/2023-05/2023-05-20/20230520-143015_4032 IMG_1234.jpg
+/output/videos/mp4/2022/2022-12/2022-12-25/20221225-103045_1920 VID_5678.mp4
+```
+
+### Custom Extension-Specific Paths
+
+If extension-specific destinations are defined in the configuration, files will be organized:
+
+```
+<extension_destination>/YYYY/YYYY-MM/YYYY-MM-DD/YYYYMMDD-HHMMSS_<dimension> <original_name>.<ext>
+```
+
+For example, with the following configuration:
+```yaml
+extension_destinations:
+  jpg: /path/to/custom/jpeg/photos
+```
+
+The output would be:
+```
+/path/to/custom/jpeg/photos/2023/2023-05/2023-05-20/20230520-143015_4032 IMG_1234.jpg
 ```
 
 ## Requirements
