@@ -38,31 +38,41 @@ func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDu
 
 	var destPath string
 
+	dateStructure := filepath.Join(year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
+
 	if extensionDir != "" {
 		// Use the extension-specific directory (scheme doesn't apply here)
-		destPath = extensionDir
-		// For duplicates, add a duplicates subfolder
-		if isDuplicate {
-			destPath = filepath.Join(destPath, duplicatesDir)
+		if isDuplicate && filepath.IsAbs(duplicatesDir) {
+			// Absolute duplicates path: use it directly with date structure
+			destPath = filepath.Join(duplicatesDir, dateStructure)
+		} else if isDuplicate {
+			// Relative duplicates path: append to extension dir
+			destPath = filepath.Join(extensionDir, duplicatesDir, dateStructure)
+		} else {
+			destPath = filepath.Join(extensionDir, dateStructure)
 		}
-		// Add date-based directory structure
-		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
 	} else if scheme == "date_first" {
 		// date_first: <dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>
-		destPath = baseDir
-		// For duplicates, add a duplicates subfolder
-		if isDuplicate {
-			destPath = filepath.Join(destPath, duplicatesDir)
+		if isDuplicate && filepath.IsAbs(duplicatesDir) {
+			// Absolute duplicates path: use it directly with date structure and extension
+			destPath = filepath.Join(duplicatesDir, dateStructure, ext)
+		} else if isDuplicate {
+			// Relative duplicates path: append to base dir
+			destPath = filepath.Join(baseDir, duplicatesDir, dateStructure, ext)
+		} else {
+			destPath = filepath.Join(baseDir, dateStructure, ext)
 		}
-		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day), ext)
 	} else {
 		// extension_first (default): <dest>/<ext>/YYYY/YYYY-MM/YYYY-MM-DD
-		destPath = filepath.Join(baseDir, ext)
-		// For duplicates, add a duplicates subfolder
-		if isDuplicate {
-			destPath = filepath.Join(destPath, duplicatesDir)
+		if isDuplicate && filepath.IsAbs(duplicatesDir) {
+			// Absolute duplicates path: use it directly with extension and date structure
+			destPath = filepath.Join(duplicatesDir, ext, dateStructure)
+		} else if isDuplicate {
+			// Relative duplicates path: append to base dir with extension
+			destPath = filepath.Join(baseDir, ext, duplicatesDir, dateStructure)
+		} else {
+			destPath = filepath.Join(baseDir, ext, dateStructure)
 		}
-		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
 	}
 
 	return destPath
