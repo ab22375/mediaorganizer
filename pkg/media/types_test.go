@@ -132,7 +132,7 @@ func TestGetDestinationPath_ExtensionFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.mediaFile.GetDestinationPath(tt.baseDir, tt.extensionDir, tt.isDuplicate, "extension_first")
+			result := tt.mediaFile.GetDestinationPath(tt.baseDir, tt.extensionDir, tt.isDuplicate, "extension_first", "duplicates")
 			if result != tt.expected {
 				t.Errorf("GetDestinationPath() = %v, want %v", result, tt.expected)
 			}
@@ -215,7 +215,7 @@ func TestGetDestinationPath_DateFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.mediaFile.GetDestinationPath(tt.baseDir, tt.extensionDir, tt.isDuplicate, "date_first")
+			result := tt.mediaFile.GetDestinationPath(tt.baseDir, tt.extensionDir, tt.isDuplicate, "date_first", "duplicates")
 			if result != tt.expected {
 				t.Errorf("GetDestinationPath() = %v, want %v", result, tt.expected)
 			}

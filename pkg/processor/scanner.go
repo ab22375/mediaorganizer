@@ -35,6 +35,7 @@ type MediaScanner struct {
 	scheme           string
 	spaceReplacement string
 	noOriginalName   bool
+	duplicatesDir    string
 	dryRun           bool
 	copyFiles        bool
 	deleteEmptyDirs  bool
@@ -47,7 +48,7 @@ type MediaScanner struct {
 	processed        int32 // Atomic counter for progress reporting
 }
 
-func NewMediaScanner(sourceDir string, destination string, destDirs map[string]string, extensionDirs map[string]string, scheme string, spaceReplacement string, noOriginalName bool, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
+func NewMediaScanner(sourceDir string, destination string, destDirs map[string]string, extensionDirs map[string]string, scheme string, spaceReplacement string, noOriginalName bool, duplicatesDir string, dryRun bool, copyFiles bool, concurrency int, deleteEmptyDirs bool) *MediaScanner {
 	return &MediaScanner{
 		sourceDir:        sourceDir,
 		destination:      destination,
@@ -56,6 +57,7 @@ func NewMediaScanner(sourceDir string, destination string, destDirs map[string]s
 		scheme:           scheme,
 		spaceReplacement: spaceReplacement,
 		noOriginalName:   noOriginalName,
+		duplicatesDir:    duplicatesDir,
 		dryRun:           dryRun,
 		copyFiles:        copyFiles,
 		deleteEmptyDirs:  deleteEmptyDirs,
@@ -202,8 +204,8 @@ func (s *MediaScanner) organizeFiles() {
 			
 			// Consider files with i > 0 as duplicates
 			isDuplicate := i > 0
-			
-			fileDir := file.GetDestinationPath(baseDestDir, extensionDir, isDuplicate, s.scheme)
+
+			fileDir := file.GetDestinationPath(baseDestDir, extensionDir, isDuplicate, s.scheme, s.duplicatesDir)
 			fileName := file.GetNewFilename(s.scheme, s.spaceReplacement, s.noOriginalName)
 			
 			// Add sequence if multiple files with same timestamp
@@ -221,7 +223,7 @@ func (s *MediaScanner) organizeFiles() {
 			}
 
 			if s.dryRun {
-				logrus.Infof("[DRY RUN] Would %s: %s -> %s", operation, file.SourcePath, destPath)
+				logrus.Infof("[DRY RUN] Would %s: %s -> \n%s", operation, file.SourcePath, destPath)
 				s.result.OrganizedFiles++
 				continue
 			}
@@ -236,15 +238,15 @@ func (s *MediaScanner) organizeFiles() {
 			var err error
 			if s.copyFiles {
 				// Copy the file
-				err = copyFile(file.SourcePath, destPath, &s.result.DuplicateCount)
+				err = copyFile(file.SourcePath, destPath, &s.result.DuplicateCount, s.duplicatesDir)
 				if err == nil {
-					logrus.Infof("Copied: %s -> %s", file.SourcePath, destPath)
+					logrus.Infof("Copied: %s -> \n%s", file.SourcePath, destPath)
 				}
 			} else {
 				// Move the file
-				err = moveFile(file.SourcePath, destPath, &s.result.DuplicateCount)
+				err = moveFile(file.SourcePath, destPath, &s.result.DuplicateCount, s.duplicatesDir)
 				if err == nil {
-					logrus.Infof("Moved: %s -> %s", file.SourcePath, destPath)
+					logrus.Infof("Moved: %s -> \n%s", file.SourcePath, destPath)
 				}
 			}
 
@@ -262,12 +264,12 @@ func formatSequence(num int) string {
 	return fmt.Sprintf("%03d", num)
 }
 
-func moveFile(srcPath, destPath string, duplicateCount *int) error {
+func moveFile(srcPath, destPath string, duplicateCount *int, duplicatesDir string) error {
 	// Check if destination already exists
 	if _, err := os.Stat(destPath); err == nil {
 		// Generate path for duplicate
-		duplicatePath := createDuplicatePath(destPath)
-		logrus.Infof("File already exists at destination, moving to duplicates: %s -> %s", srcPath, duplicatePath)
+		duplicatePath := createDuplicatePath(destPath, duplicatesDir)
+		logrus.Infof("File already exists at destination, moving to duplicates: %s -> \n%s", srcPath, duplicatePath)
 		
 		// Ensure the duplicate directory exists
 		dupDir := filepath.Dir(duplicatePath)
@@ -310,12 +312,12 @@ func moveFile(srcPath, destPath string, duplicateCount *int) error {
 	return nil
 }
 
-func copyFile(srcPath, destPath string, duplicateCount *int) error {
+func copyFile(srcPath, destPath string, duplicateCount *int, duplicatesDir string) error {
 	// Check if destination already exists
 	if _, err := os.Stat(destPath); err == nil {
 		// Generate path for duplicate
-		duplicatePath := createDuplicatePath(destPath)
-		logrus.Infof("File already exists at destination, copying to duplicates: %s -> %s", srcPath, duplicatePath)
+		duplicatePath := createDuplicatePath(destPath, duplicatesDir)
+		logrus.Infof("File already exists at destination, copying to duplicates: %s -> \n%s", srcPath, duplicatePath)
 		
 		// Ensure the duplicate directory exists
 		dupDir := filepath.Dir(duplicatePath)
@@ -333,46 +335,12 @@ func copyFile(srcPath, destPath string, duplicateCount *int) error {
 }
 
 // Helper function to create path for duplicate files
-func createDuplicatePath(originalPath string) string {
+func createDuplicatePath(originalPath string, duplicatesDir string) string {
 	dir := filepath.Dir(originalPath)
 	base := filepath.Base(originalPath)
-	
-	// Check if the path already contains the "duplicates" folder
-	if strings.Contains(dir, string(filepath.Separator)+"duplicates"+string(filepath.Separator)) {
-		// Replace any duplicate "duplicates" folders with a single one
-		parts := strings.Split(dir, string(filepath.Separator))
-		var newParts []string
-		var foundDuplicates bool
-		
-		for _, part := range parts {
-			if part == "duplicates" {
-				if !foundDuplicates {
-					newParts = append(newParts, part)
-					foundDuplicates = true
-				}
-				// Skip additional "duplicates" parts
-			} else {
-				newParts = append(newParts, part)
-			}
-		}
-		
-		// Rebuild the path with only one "duplicates" folder
-		if filepath.IsAbs(originalPath) {
-			dir = string(filepath.Separator) + filepath.Join(newParts...)
-		} else {
-			dir = filepath.Join(newParts...)
-		}
-		
-		return filepath.Join(dir, base)
-	}
-	
-	// If not, add a "duplicates" folder
 	parts := strings.Split(dir, string(filepath.Separator))
-	
-	// Ensure the path will be absolute if the original was absolute
-	isAbsolute := filepath.IsAbs(originalPath)
-	
-	// Find the year part (format YYYY) to determine where to insert duplicates folder
+
+	// Find the year part (format YYYY) to extract date structure
 	yearIndex := -1
 	for i, part := range parts {
 		if len(part) == 4 && regexp.MustCompile(`^\d{4}$`).MatchString(part) {
@@ -380,24 +348,63 @@ func createDuplicatePath(originalPath string) string {
 			break
 		}
 	}
-	
+
+	// If duplicatesDir is an absolute path, redirect to that location with date structure
+	if filepath.IsAbs(duplicatesDir) {
+		if yearIndex >= 0 {
+			// Extract date structure (year/month/day/ext) from original path
+			dateStructure := parts[yearIndex:]
+			return filepath.Join(duplicatesDir, filepath.Join(dateStructure...), base)
+		}
+		// No date structure found, just put file directly in duplicatesDir
+		return filepath.Join(duplicatesDir, base)
+	}
+
+	// For relative duplicatesDir, check if path already contains it
+	if strings.Contains(dir, string(filepath.Separator)+duplicatesDir+string(filepath.Separator)) {
+		// Replace any duplicate duplicates folders with a single one
+		var newParts []string
+		var foundDuplicates bool
+
+		for _, part := range parts {
+			if part == duplicatesDir {
+				if !foundDuplicates {
+					newParts = append(newParts, part)
+					foundDuplicates = true
+				}
+				// Skip additional duplicates parts
+			} else {
+				newParts = append(newParts, part)
+			}
+		}
+
+		// Rebuild the path with only one duplicates folder
+		if filepath.IsAbs(originalPath) {
+			dir = string(filepath.Separator) + filepath.Join(newParts...)
+		} else {
+			dir = filepath.Join(newParts...)
+		}
+
+		return filepath.Join(dir, base)
+	}
+
+	// Insert duplicates folder before the year
+	isAbsolute := filepath.IsAbs(originalPath)
 	var resultPath string
-	
+
 	if yearIndex > 0 {
-		// Insert "duplicates" folder before the year
-		newParts := append(parts[:yearIndex], append([]string{"duplicates"}, parts[yearIndex:]...)...)
-		
+		newParts := append(parts[:yearIndex], append([]string{duplicatesDir}, parts[yearIndex:]...)...)
+
 		if isAbsolute {
-			// Make sure we preserve the leading slash
 			resultPath = filepath.Join(string(filepath.Separator), filepath.Join(newParts...))
 		} else {
 			resultPath = filepath.Join(newParts...)
 		}
 	} else {
 		// If year format not found, just add duplicates at the end of the path
-		resultPath = filepath.Join(dir, "duplicates")
+		resultPath = filepath.Join(dir, duplicatesDir)
 	}
-	
+
 	return filepath.Join(resultPath, base)
 }
 
@@ -439,6 +446,11 @@ func copyFileImpl(srcPath, destPath string) error {
 // GetProcessedCount returns the current count of processed files
 func (s *MediaScanner) GetProcessedCount() int {
 	return int(atomic.LoadInt32(&s.processed))
+}
+
+// GetTotalFiles returns the total count of files to process
+func (s *MediaScanner) GetTotalFiles() int {
+	return s.result.TotalFiles
 }
 
 // cleanupEmptyDirectories removes empty directories within the source directory

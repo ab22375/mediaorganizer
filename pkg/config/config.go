@@ -43,6 +43,7 @@ type Config struct {
 	OrganizationScheme OrganizationScheme           `mapstructure:"organization_scheme"`
 	SpaceReplacement   string                       `mapstructure:"space_replacement"`
 	NoOriginalName     bool                         `mapstructure:"no_original_name"`
+	DuplicatesDir      string                       `mapstructure:"duplicates_dir"`
 	DryRun             bool                         `mapstructure:"dry_run"`
 	Verbose            bool                         `mapstructure:"verbose"`
 	LogFile            string                       `mapstructure:"log_file"`
@@ -61,6 +62,7 @@ func LoadConfig() (*Config, error) {
 		},
 		ExtensionDirs:      make(map[string]string),
 		OrganizationScheme: SchemeExtensionFirst,
+		DuplicatesDir:      "duplicates",
 		ConcurrentJobs:     4,
 	}
 
@@ -86,6 +88,7 @@ func LoadConfig() (*Config, error) {
 	pflag.StringVar(&schemeFlag, "scheme", string(config.OrganizationScheme), "Organization scheme: extension_first (default) or date_first")
 	pflag.StringVar(&config.SpaceReplacement, "space-replace", "", "Replace spaces in filenames (default: _ when flag is used)")
 	pflag.BoolVar(&config.NoOriginalName, "no-original-name", false, "Discard original filename, use only timestamp and dimension")
+	pflag.StringVar(&config.DuplicatesDir, "duplicates-dir", config.DuplicatesDir, "Directory name or path for duplicate files")
 
 	configFile := pflag.String("config", "", "Path to configuration file (YAML/JSON)")
 
@@ -159,6 +162,10 @@ func LoadConfig() (*Config, error) {
 
 	if pflag.Lookup("scheme").Changed {
 		config.OrganizationScheme = OrganizationScheme(schemeFlag)
+	}
+
+	if pflag.Lookup("duplicates-dir").Changed {
+		config.DuplicatesDir = pflag.Lookup("duplicates-dir").Value.String()
 	}
 
 	// Validate config

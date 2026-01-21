@@ -74,7 +74,8 @@ func main() {
 
 	// Create and start scanner
 	logrus.Debugf("Creating scanner...")
-	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.Destination, cfg.DestDirs, cfg.ExtensionDirs, string(cfg.OrganizationScheme), cfg.SpaceReplacement, cfg.NoOriginalName, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
+	logrus.Debugf("Duplicates directory: %s", cfg.DuplicatesDir)
+	scanner := processor.NewMediaScanner(cfg.SourceDir, cfg.Destination, cfg.DestDirs, cfg.ExtensionDirs, string(cfg.OrganizationScheme), cfg.SpaceReplacement, cfg.NoOriginalName, cfg.DuplicatesDir, cfg.DryRun, cfg.CopyFiles, cfg.ConcurrentJobs, cfg.DeleteEmptyDirs)
 	
 	logrus.Infof("Starting scan with %d concurrent workers...", cfg.ConcurrentJobs)
 	startTime := time.Now()
@@ -85,10 +86,9 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
-		
+
 		for range ticker.C {
-			// This will only report approximate progress as we don't know total beforehand
-			fmt.Printf("Processed files: %d\n", scanner.GetProcessedCount())
+			fmt.Printf("Processed files: %d/%d\n", scanner.GetProcessedCount(), scanner.GetTotalFiles())
 		}
 	}()
 	

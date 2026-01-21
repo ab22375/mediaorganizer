@@ -30,7 +30,7 @@ func (m *MediaFile) GetExtension() string {
 	return strings.TrimPrefix(strings.ToLower(filepath.Ext(m.SourcePath)), ".")
 }
 
-func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDuplicate bool, scheme string) string {
+func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDuplicate bool, scheme string, duplicatesDir string) string {
 	year := m.CreationTime.Format("2006")
 	month := m.CreationTime.Format("01")
 	day := m.CreationTime.Format("02")
@@ -41,26 +41,26 @@ func (m *MediaFile) GetDestinationPath(baseDir string, extensionDir string, isDu
 	if extensionDir != "" {
 		// Use the extension-specific directory (scheme doesn't apply here)
 		destPath = extensionDir
-		// For duplicates, add a "duplicates" subfolder
+		// For duplicates, add a duplicates subfolder
 		if isDuplicate {
-			destPath = filepath.Join(destPath, "duplicates")
+			destPath = filepath.Join(destPath, duplicatesDir)
 		}
 		// Add date-based directory structure
 		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
 	} else if scheme == "date_first" {
 		// date_first: <dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>
 		destPath = baseDir
-		// For duplicates, add a "duplicates" subfolder
+		// For duplicates, add a duplicates subfolder
 		if isDuplicate {
-			destPath = filepath.Join(destPath, "duplicates")
+			destPath = filepath.Join(destPath, duplicatesDir)
 		}
 		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day), ext)
 	} else {
 		// extension_first (default): <dest>/<ext>/YYYY/YYYY-MM/YYYY-MM-DD
 		destPath = filepath.Join(baseDir, ext)
-		// For duplicates, add a "duplicates" subfolder
+		// For duplicates, add a duplicates subfolder
 		if isDuplicate {
-			destPath = filepath.Join(destPath, "duplicates")
+			destPath = filepath.Join(destPath, duplicatesDir)
 		}
 		destPath = filepath.Join(destPath, year, fmt.Sprintf("%s-%s", year, month), fmt.Sprintf("%s-%s-%s", year, month, day))
 	}
