@@ -85,7 +85,10 @@ func LoadConfig() (*Config, error) {
 	pflag.BoolVar(&config.DeleteEmptyDirs, "delete-empty-dirs", false, "Delete empty folders in source directory after moving files")
 	pflag.StringVarP(&config.LogFile, "log-file", "l", "", "Log file path")
 	pflag.IntVarP(&config.ConcurrentJobs, "jobs", "j", config.ConcurrentJobs, "Number of concurrent processing jobs")
-	pflag.StringVar(&schemeFlag, "scheme", string(config.OrganizationScheme), "Organization scheme: extension_first (default) or date_first")
+	pflag.StringVar(&schemeFlag, "scheme", string(config.OrganizationScheme),
+		"Organization scheme:\n"+
+		"  extension_first: <type-dest>/<ext>/YYYY/YYYY-MM/YYYY-MM-DD/file (uses --image-dest, --video-dest, --audio-dest)\n"+
+		"  date_first:      <dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>/file (uses --dest for all media types)")
 	pflag.StringVar(&config.SpaceReplacement, "space-replace", "", "Replace spaces in filenames (default: _ when flag is used)")
 	pflag.BoolVar(&config.NoOriginalName, "no-original-name", false, "Discard original filename, use only timestamp and dimension")
 	pflag.StringVar(&config.DuplicatesDir, "duplicates-dir", config.DuplicatesDir, "Directory name or path for duplicate files")
