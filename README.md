@@ -4,6 +4,11 @@ A Golang utility for organizing media files (images, videos, audio) by creation 
 
 ## Features
 
+- **Streaming pipeline**: Files start moving as soon as metadata is extracted (no waiting for full scan)
+- **SQLite journal**: All operations tracked for automatic resume on interruption
+- **Global deduplication**: SHA-256 hash-based duplicate detection across all files (not just same-timestamp groups)
+- **Cross-scan deduplication**: Pre-indexes existing destination files at startup, detecting duplicates even when scanning from different source directories
+- **Lazy hashing**: Only computes file hashes when two files share the same size, minimizing I/O
 - Recursively scans source directories for media files
 - Extracts creation dates from EXIF metadata, file metadata, or fallback to file creation date
 - Organizes files into a structured directory hierarchy based on dates
@@ -78,6 +83,15 @@ go build
 
 # Delete empty directories after moving files
 ./mediaorganizer --source /path/to/media/files --delete-empty-dirs
+
+# Resume an interrupted run (just re-run the same command)
+./mediaorganizer --source /path/to/media/files
+
+# Force a fresh start, ignoring previous journal
+./mediaorganizer --source /path/to/media/files --fresh
+
+# Use a custom database path
+./mediaorganizer --source /path/to/media/files --db /path/to/journal.db
 
 # Use date_first organization scheme with unified destination
 ./mediaorganizer --source /path/to/media/files --scheme date_first --dest /path/to/output
@@ -164,9 +178,19 @@ organization_scheme: date_first
 destination: /path/to/output
 ```
 
+## Resume Support
+
+The program creates a SQLite journal database (default: `<source>/.mediaorganizer.db`) that tracks every file operation. If interrupted (Ctrl+C, crash, etc.), simply re-run the same command and it will:
+
+- Skip files that were already successfully moved/copied
+- Retry files that previously failed
+- Continue processing any remaining files
+
+Use `--fresh` to start over from scratch, or `--db` to specify a custom journal path.
+
 ## Requirements
 
-- Go 1.18 or higher
+- Go 1.24 or higher
 
 ## License
 

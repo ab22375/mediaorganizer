@@ -50,6 +50,8 @@ type Config struct {
 	ConcurrentJobs     int                          `mapstructure:"concurrent_jobs"`
 	CopyFiles          bool                         `mapstructure:"copy_files"`
 	DeleteEmptyDirs    bool                         `mapstructure:"delete_empty_dirs"`
+	DBPath             string                       `mapstructure:"db_path"`
+	Fresh              bool                         `mapstructure:"fresh"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -92,6 +94,8 @@ func LoadConfig() (*Config, error) {
 	pflag.StringVar(&config.SpaceReplacement, "space-replace", "", "Replace spaces in filenames (default: _ when flag is used)")
 	pflag.BoolVar(&config.NoOriginalName, "no-original-name", false, "Discard original filename, use only timestamp and dimension")
 	pflag.StringVar(&config.DuplicatesDir, "duplicates-dir", config.DuplicatesDir, "Directory name or path for duplicate files")
+	pflag.StringVar(&config.DBPath, "db", "", "Path to SQLite journal database (default: <source>/.mediaorganizer.db)")
+	pflag.BoolVar(&config.Fresh, "fresh", false, "Force a fresh start, ignore existing database")
 
 	configFile := pflag.String("config", "", "Path to configuration file (YAML/JSON)")
 
@@ -171,6 +175,14 @@ func LoadConfig() (*Config, error) {
 		config.DuplicatesDir = pflag.Lookup("duplicates-dir").Value.String()
 	}
 
+	if pflag.Lookup("db").Changed {
+		config.DBPath = pflag.Lookup("db").Value.String()
+	}
+
+	if pflag.Lookup("fresh").Changed {
+		config.Fresh = pflag.Lookup("fresh").Value.String() == "true"
+	}
+
 	// Validate config
 	if config.SourceDir == "" {
 		return nil, &ConfigError{"source directory is required"}
@@ -185,6 +197,16 @@ func LoadConfig() (*Config, error) {
 	config.SourceDir, err = filepath.Abs(config.SourceDir)
 	if err != nil {
 		return nil, err
+	}
+
+	// Default DBPath to <source>/.mediaorganizer.db
+	if config.DBPath == "" {
+		config.DBPath = filepath.Join(config.SourceDir, ".mediaorganizer.db")
+	} else {
+		config.DBPath, err = filepath.Abs(config.DBPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if config.Destination != "" {

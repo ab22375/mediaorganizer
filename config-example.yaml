@@ -50,3 +50,10 @@ log_file: organizer.log
 
 # Number of concurrent processing jobs
 concurrent_jobs: 4
+
+# Path to SQLite journal database (default: <source>/.mediaorganizer.db)
+# The journal tracks all file operations for resume support and global deduplication.
+# db_path: /path/to/custom/journal.db
+
+# Force a fresh start, ignoring any existing database
+# fresh: false

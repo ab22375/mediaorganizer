@@ -30,6 +30,11 @@ go.work
 ehthumbs.db
 Thumbs.db
 
+# SQLite databases
+*.db
+*.db-wal
+*.db-shm
+
 # Config files that might contain personal paths
 config.yaml
 test-config.yaml

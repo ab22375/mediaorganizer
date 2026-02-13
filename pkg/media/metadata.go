@@ -1,6 +1,8 @@
 package media
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"image"
 	"io"
@@ -58,7 +60,23 @@ func ExtractFileMetadata(filePath string) (*MediaFile, error) {
 	}
 
 	mediaFile.CreationTime = creationTime
+
 	return mediaFile, nil
+}
+
+// ComputeFileHash returns the SHA-256 hex digest of the file at filePath.
+func ComputeFileHash(filePath string) (string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func extractImageMetadata(filePath string, mediaFile *MediaFile) (time.Time, error) {
