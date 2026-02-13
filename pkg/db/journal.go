@@ -52,22 +52,13 @@ type Journal struct {
 
 // InitJournal opens (or creates) the SQLite database and initializes the schema.
 func InitJournal(dbPath string) (*Journal, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	// Pass pragmas via DSN so they apply to every connection in the pool,
+	// not just the first one. This prevents SQLITE_BUSY errors from connections
+	// that miss the busy_timeout pragma.
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode%%3DWAL&_pragma=synchronous%%3DNORMAL&_pragma=busy_timeout%%3D5000", dbPath)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open journal db: %w", err)
-	}
-
-	// Set pragmas for performance
-	pragmas := []string{
-		"PRAGMA journal_mode=WAL",
-		"PRAGMA synchronous=NORMAL",
-		"PRAGMA busy_timeout=5000",
-	}
-	for _, p := range pragmas {
-		if _, err := db.Exec(p); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("set pragma %q: %w", p, err)
-		}
 	}
 
 	// Create schema

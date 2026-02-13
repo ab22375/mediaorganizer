@@ -204,6 +204,22 @@ func (s *MediaScanner) Scan() *ScanResult {
 
 		// First: re-queue pending records from resume
 		for _, rec := range pendingRecords {
+			// Verify source file still exists before re-queuing
+			if _, err := os.Stat(rec.SourcePath); os.IsNotExist(err) {
+				// Source is gone — check if dest already has the file (previous move succeeded but status wasn't updated)
+				if rec.DestPath != "" {
+					if _, err := os.Stat(rec.DestPath); err == nil {
+						logrus.Infof("Resume: source gone but dest exists, marking completed: %s", rec.DestPath)
+						s.journal.UpdateStatus(rec.ID, db.StatusCompleted, "")
+						atomic.AddInt32(&s.organized, 1)
+						continue
+					}
+				}
+				logrus.Warnf("Resume: source file no longer exists, marking failed: %s", rec.SourcePath)
+				s.journal.UpdateStatus(rec.ID, db.StatusFailed, "source file missing on resume")
+				continue
+			}
+
 			mf := recordToMediaFile(rec)
 			moveCh <- moveJob{
 				RecordID:    rec.ID,
@@ -275,7 +291,12 @@ func (s *MediaScanner) Scan() *ScanResult {
 					logrus.Errorf("GetUnhashedByFileSize error: %v", err)
 				}
 				for _, ur := range unhashed {
-					bh, err := media.ComputeFileHash(ur.SourcePath)
+					// Try source path first, fall back to dest path if source was already moved
+					hashPath := ur.SourcePath
+					if _, statErr := os.Stat(hashPath); os.IsNotExist(statErr) && ur.DestPath != "" {
+						hashPath = ur.DestPath
+					}
+					bh, err := media.ComputeFileHash(hashPath)
 					if err != nil {
 						logrus.Warnf("Could not backfill hash for %s: %v", ur.SourcePath, err)
 						continue

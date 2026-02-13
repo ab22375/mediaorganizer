@@ -104,6 +104,13 @@ go build
 
 # Discard original filename, use only timestamp and dimension
 ./mediaorganizer --source /path/to/media/files --no-original-name
+
+
+SRC="/path/to/source"
+DST="/path/to/destination"
+DUP="/path/to/duplicates"
+./mediaorganizer -j 6 -no-original-name --source "$SRC" --scheme date_first --dest "$DST" --duplicates-dir DUP
+
 ```
 
 ## Configuration File
