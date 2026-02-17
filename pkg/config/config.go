@@ -54,7 +54,7 @@ type Config struct {
 	Fresh              bool                         `mapstructure:"fresh"`
 }
 
-func LoadConfig() (*Config, error) {
+func LoadConfig(version string) (*Config, error) {
 	// Default configuration
 	config := &Config{
 		DestDirs: map[string]string{
@@ -70,17 +70,18 @@ func LoadConfig() (*Config, error) {
 
 	// Set up command line flags
 	pflag.StringVarP(&config.SourceDir, "source", "s", "", "Source directory to scan for media files")
-	
+
 	// Define variables to hold command line values
 	var destFlag, imageDestFlag, videoDestFlag, audioDestFlag string
 	var schemeFlag string
+	var showVersion bool
 
 	// Define flags with default values
 	pflag.StringVar(&destFlag, "dest", "", "Unified destination directory (used with date_first scheme)")
 	pflag.StringVar(&imageDestFlag, "image-dest", config.DestDirs["image"], "Destination directory for images")
 	pflag.StringVar(&videoDestFlag, "video-dest", config.DestDirs["video"], "Destination directory for videos")
 	pflag.StringVar(&audioDestFlag, "audio-dest", config.DestDirs["audio"], "Destination directory for audio files")
-	
+
 	pflag.BoolVarP(&config.DryRun, "dry-run", "d", false, "Simulate the organization process without moving files")
 	pflag.BoolVarP(&config.Verbose, "verbose", "v", false, "Enable verbose logging")
 	pflag.BoolVarP(&config.CopyFiles, "copy", "c", false, "Copy files instead of moving them")
@@ -96,13 +97,63 @@ func LoadConfig() (*Config, error) {
 	pflag.StringVar(&config.DuplicatesDir, "duplicates-dir", config.DuplicatesDir, "Directory name or path for duplicate files")
 	pflag.StringVar(&config.DBPath, "db", "", "Path to SQLite journal database (default: <source>/.mediaorganizer.db)")
 	pflag.BoolVar(&config.Fresh, "fresh", false, "Force a fresh start, ignore existing database")
+	pflag.BoolVar(&showVersion, "version", false, "Show version and exit")
 
 	configFile := pflag.String("config", "", "Path to configuration file (YAML/JSON)")
 
 	// Set NoOptDefVal so --space-replace without value uses "_"
 	pflag.Lookup("space-replace").NoOptDefVal = "_"
 
+	// Custom usage output
+	pflag.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Media Organizer %s
+Organize media files by date using EXIF/ffprobe metadata.
+
+Usage:
+  mediaorganizer -s <source> [options]
+
+Source & Destinations:
+  -s, --source <path>          Source directory to scan (required)
+      --dest <path>            Unified destination (for date_first scheme)
+      --image-dest <path>      Image destination (default: ./output/images)
+      --video-dest <path>      Video destination (default: ./output/videos)
+      --audio-dest <path>      Audio destination (default: ./output/audio)
+
+Organization:
+      --scheme <scheme>        extension_first (default) or date_first
+      --duplicates-dir <name>  Directory for duplicates (default: duplicates)
+      --space-replace[=<ch>]   Replace spaces in filenames (default: _ when used)
+      --no-original-name       Discard original filename in output
+
+Operation Mode:
+  -d, --dry-run                Preview changes without moving/copying files
+  -c, --copy                   Copy files instead of moving them
+      --delete-empty-dirs      Remove empty source folders after moving
+
+Database & Resume:
+      --db <path>              SQLite journal path (default: <source>/.mediaorganizer.db)
+      --fresh                  Ignore existing database, start fresh
+
+General:
+      --config <path>          Load settings from YAML/JSON config file
+  -j, --jobs <n>               Concurrent workers (default: 4)
+  -l, --log-file <path>        Write logs to file
+  -v, --verbose                Enable debug logging
+      --version                Show version and exit
+
+Organization Schemes:
+  extension_first   <type-dest>/<ext>/YYYY/YYYY-MM/YYYY-MM-DD/file
+  date_first        <dest>/YYYY/YYYY-MM/YYYY-MM-DD/<ext>/file
+`, version)
+	}
+
 	pflag.Parse()
+
+	// Handle --version
+	if showVersion {
+		fmt.Printf("mediaorganizer %s\n", version)
+		os.Exit(0)
+	}
 
 	// Read from config file first if provided
 	if *configFile != "" {

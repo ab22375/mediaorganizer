@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **`--version` flag**: Shows version and exits. Version is injected at build time via `-ldflags`
+- **Structured `--help` output**: Flags grouped into logical sections (Source & Destinations, Organization, Operation Mode, Database & Resume, General) instead of flat alphabetical list
+- **Build-time version injection**: `make build` uses `git describe --tags --always --dirty` to embed version in the binary
+
+### Changed
+- `LoadConfig()` now accepts a `version` parameter for display in help/version output
+- Removed premature debug log that printed before flag parsing
+- Makefile uses `-ldflags "-X main.version=$(VERSION)"` in all build/run targets
+
+## [Unreleased - previous]
+
+### Added
 - **Video/audio metadata via ffprobe**: Shells out to `ffprobe` for real `creation_time` tags from video/audio containers (MP4, MOV, MKV, etc.). Falls back to file modification time if ffprobe is not installed
 - **Destination collision protection**: Mover checks if dest file exists before writing; `copyFileImpl` uses `O_EXCL` flag to prevent silent overwrites
 - **Copy integrity verification**: Verifies written byte count matches source size after copy to catch partial writes

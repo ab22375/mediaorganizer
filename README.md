@@ -56,9 +56,22 @@ A Golang utility for organizing media files (images, videos, audio) by creation 
 git clone https://github.com/yourusername/media-organizer.git
 cd media-organizer
 
-# Build the application
-go build
+# Build the application (injects version from git tag)
+make build
+
+# Check version
+./mediaorganizer --version
 ```
+
+To create a release version, tag a commit before building:
+
+```bash
+git tag v1.2.0
+make build
+# → mediaorganizer v1.2.0
+```
+
+Without a tag, version falls back to the short commit hash (e.g. `53c7d28`). A `-dirty` suffix appears if there are uncommitted changes.
 
 ## Usage
 

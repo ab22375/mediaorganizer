@@ -14,13 +14,12 @@ import (
 	"mediaorganizer/pkg/processor"
 )
 
-func main() {
-	// Set log level to debug by default for troubleshooting
-	logrus.SetLevel(logrus.DebugLevel)
+// Set via -ldflags at build time
+var version = "dev"
 
+func main() {
 	// Load configuration
-	logrus.Debugf("Loading configuration...")
-	cfg, err := config.LoadConfig()
+	cfg, err := config.LoadConfig(version)
 	if err != nil {
 		logrus.Fatalf("Error loading configuration: %v", err)
 	}

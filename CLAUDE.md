@@ -5,11 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Run Commands
 
 ```bash
-# Build the binary
+# Build the binary (injects version from git tag via ldflags)
 make build
 
-# Cross-compile for Linux
-GOOS=linux GOARCH=amd64 go build -o mediaorganizer-linux .
+# Build with explicit version
+VERSION=v1.2.0 make build
+
+# Cross-compile for Linux (manual ldflags needed)
+VERSION=$(git describe --tags --always --dirty) GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$VERSION" -o mediaorganizer-linux .
 
 # Run tests
 make test
@@ -33,8 +36,8 @@ Media Organizer is a Go utility that organizes media files (images, videos, audi
 
 ### Package Structure
 
-- **main.go** - Entry point, loads config, initializes SQLite journal, wires up signal handling, starts scanner
-- **pkg/config** - Configuration loading via CLI flags (spf13/pflag) and YAML/JSON files (spf13/viper)
+- **main.go** - Entry point, defines `var version` (set via `-ldflags`), loads config, initializes SQLite journal, wires up signal handling, starts scanner
+- **pkg/config** - Configuration loading via CLI flags (spf13/pflag) and YAML/JSON files (spf13/viper). `LoadConfig(version string)` accepts version for `--help`/`--version` display. Custom `pflag.Usage` groups flags into logical sections.
 - **pkg/db** - SQLite journal layer (modernc.org/sqlite, pure Go) for tracking file operations, resume, and dedup
 - **pkg/media** - Media type definitions and metadata extraction (EXIF for images via rwcarlsen/goexif, ffprobe for video/audio, xxHash for dedup)
 - **pkg/processor** - Streaming pipeline scanner with concurrent workers
@@ -95,6 +98,14 @@ Uses a unified destination (`--dest`), all media types in one directory:
 `<dest>/YYYY/YYYY-MM/YYYY-MM-DD/<extension>/YYYYMMDD-HHMMSS_<dimension>_<original_name>.<ext>`
 
 Duplicates (same hash) get sequence suffixes (`_001`, `_002`, `_003`) and can be routed to a `duplicates/` subfolder. When multiple files share a timestamp, all receive sequence suffixes for consistency.
+
+### Configuration Priority
+
+### Versioning
+
+- `var version = "dev"` in `main.go`, overridden at build time via `-ldflags "-X main.version=$(VERSION)"`
+- `VERSION` in Makefile defaults to `git describe --tags --always --dirty` (tag > commit hash > "dev")
+- To release: `git tag v1.2.0 && make build`
 
 ### Configuration Priority
 
