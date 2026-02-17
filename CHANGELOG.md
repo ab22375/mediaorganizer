@@ -5,40 +5,33 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **Linux cross-compilation**: Verified fully cross-platform (pure Go, no CGo). Built and deployed to Linux (PopOS) via `GOOS=linux GOARCH=amd64 go build`
-- **Cross-scan duplicate detection**: Pre-indexes existing files in destination directories before processing, so duplicates from previous scans with different source directories are detected
-  - New `dest_index` file status in journal for pre-indexed destination files
-  - `preIndexDestinations()` walks all configured destination directories at scan start
-  - Batch inserts destination files in a single SQLite transaction (`INSERT OR IGNORE`)
-  - Skips source directory during destination walk to avoid self-indexing
-  - Cleans up `dest_index` rows before computing final stats
-- **SQLite journal** (`pkg/db/journal.go`): All file operations tracked in a SQLite database for resume support and global deduplication
-  - Uses `modernc.org/sqlite` (pure Go, no CGo)
-  - WAL mode for concurrent read performance
-  - 14 unit tests in `pkg/db/journal_test.go`
-- **Streaming pipeline**: Files start moving as soon as metadata is extracted, no more waiting for full scan
-  - Walker goroutine → N metadata workers → single organizer goroutine → N mover workers
-  - Organizer serializes all DB writes (no concurrent write contention)
-- **Lazy hashing**: SHA-256 only computed when another file with the same `file_size` exists in DB
-  - Backfills unhashed files when a second same-size file appears
-- **Global duplicate detection**: Dedup across all files via hash matching (not just same-timestamp groups)
-- **Resume support**: Interrupted operations resume automatically from the journal
-  - Completed files are skipped on re-run
-  - Failed files are retried
-  - Pending files with assigned destinations are re-queued
-- **`--db` flag**: Custom path to SQLite journal database (default: `<source>/.mediaorganizer.db`)
-- **`--fresh` flag**: Force a fresh start, ignoring existing database
-- **Signal handling**: SIGINT/SIGTERM gracefully closes the journal and logs resume instructions
-- **Progress reporting**: Updated ticker shows `Scanned: X/Y | Organized: Z`
+- **Video/audio metadata via ffprobe**: Shells out to `ffprobe` for real `creation_time` tags from video/audio containers (MP4, MOV, MKV, etc.). Falls back to file modification time if ffprobe is not installed
+- **Destination collision protection**: Mover checks if dest file exists before writing; `copyFileImpl` uses `O_EXCL` flag to prevent silent overwrites
+- **Copy integrity verification**: Verifies written byte count matches source size after copy to catch partial writes
+- **Consistent sequence numbering**: When multiple files share a timestamp, all get sequence suffixes (`_001`, `_002`, ...). Previously the first file had no suffix, creating an inconsistent gap
+- **Dest-index hash persistence**: Pre-indexed destination files retain their computed hashes across runs, avoiding re-hashing gigabytes of already-organized files on every scan
 
 ### Changed
-- **Lazy hashing backfill**: Always backfills unhashed same-size files (was previously limited to the 1-to-2 transition). Required for correct cross-scan dedup when destination has multiple same-size files.
-- `pkg/processor/scanner.go`: Complete rewrite from two-phase (scan-all-then-organize) to streaming pipeline
-- `pkg/media/metadata.go`: `ExtractFileMetadata()` no longer computes hash; `ComputeFileHash()` remains as standalone function
-- `pkg/config/config.go`: Added `DBPath` and `Fresh` fields with CLI flag support
-- `main.go`: Wired up journal initialization, resume detection, signal handling
-- `.gitignore`: Added `*.db`, `*.db-wal`, `*.db-shm`
-- `config-example.yaml`: Documented `db_path` and `fresh` options
+- **xxHash replaces SHA-256**: Switched from `crypto/sha256` to `github.com/cespare/xxhash/v2` (XXH64) for file dedup hashing. 5-10x faster on large media files with equivalent collision resistance for dedup
+- **`filepath.WalkDir` replaces `filepath.Walk`**: All directory walks (walker, pre-index, cleanup) use `WalkDir` to avoid an extra `Stat` syscall per entry. Significant speedup on large directory trees
+- **Symlink safety**: `WalkDir` does not follow symlinks to directories. Files that are symlinks are explicitly skipped to prevent infinite loops and double-processing
+- **Backfill hashing safety**: No longer falls back to reading dest files during backfill hashing; skips files whose source is missing to avoid racing with concurrent mover goroutines
+- **Atomic TotalFiles counter**: Fixed data race where walker goroutine incremented `TotalFiles` non-atomically while the progress reporter read it from the main goroutine
+- **Timestamp preservation on copy**: `copyFileImpl` now preserves source file modification time via `os.Chtimes`
+- **`ExtractFileMetadata` avoids double open**: Uses `os.Stat()` instead of `os.Open()`+`file.Stat()` for the initial stat, eliminating a redundant file descriptor
+- **Journal helpers cleaned up**: Replaced custom `contains`/`searchString` functions with `strings.Contains`
+- **Stats exclude dest_index**: `Stats()` and `TotalCount()` queries now exclude `dest_index` rows for accurate reporting
+- **`ClearDestIndex` preserves hashed rows**: Only removes dest_index rows without a computed hash; rows with hashes are kept for the next run
+
+### Previous (pre-changelog)
+- **Linux cross-compilation**: Verified fully cross-platform (pure Go, no CGo). Built and deployed to Linux (PopOS) via `GOOS=linux GOARCH=amd64 go build`
+- **Cross-scan duplicate detection**: Pre-indexes existing files in destination directories before processing, so duplicates from previous scans with different source directories are detected
+- **SQLite journal** (`pkg/db/journal.go`): All file operations tracked in a SQLite database for resume support and global deduplication
+- **Streaming pipeline**: Files start moving as soon as metadata is extracted, no more waiting for full scan
+- **Lazy hashing**: Only computed when another file with the same `file_size` exists in DB
+- **Global duplicate detection**: Dedup across all files via hash matching (not just same-timestamp groups)
+- **Resume support**: Interrupted operations resume automatically from the journal
+- **Signal handling**: SIGINT/SIGTERM gracefully closes the journal and logs resume instructions
 
 ## [1.1.0] - Organization Schemes
 

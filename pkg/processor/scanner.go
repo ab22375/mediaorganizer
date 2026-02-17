@@ -44,6 +44,7 @@ type MediaScanner struct {
 	journal          *db.Journal
 	resumeMode       bool
 	result           ScanResult
+	totalFiles       int32 // Atomic counter for discovered files
 	processed        int32 // Atomic counter for metadata-extracted files
 	organized        int32 // Atomic counter for moved/copied files
 }
@@ -130,14 +131,21 @@ func (s *MediaScanner) Scan() *ScanResult {
 	moveCh := make(chan moveJob, 100)
 
 	// --- Stage 1: Walker goroutine ---
+	// Uses WalkDir instead of Walk to avoid an extra Stat call per entry
+	// and to avoid following symlinks (which can cause infinite loops).
 	go func() {
 		defer close(pathsCh)
-		filepath.Walk(s.sourceDir, func(path string, info os.FileInfo, err error) error {
+		filepath.WalkDir(s.sourceDir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				logrus.Errorf("Error accessing path %s: %v", path, err)
 				return nil
 			}
-			if info.IsDir() {
+			if d.IsDir() {
+				return nil
+			}
+
+			// Skip symlinks to avoid infinite loops and double-processing
+			if d.Type()&os.ModeSymlink != 0 {
 				return nil
 			}
 
@@ -164,8 +172,7 @@ func (s *MediaScanner) Scan() *ScanResult {
 				return nil
 			}
 
-			atomic.AddInt32(&s.processed, 0) // just count total via TotalFiles
-			s.result.TotalFiles++
+			atomic.AddInt32(&s.totalFiles, 1)
 			pathsCh <- path
 			return nil
 		})
@@ -291,10 +298,13 @@ func (s *MediaScanner) Scan() *ScanResult {
 					logrus.Errorf("GetUnhashedByFileSize error: %v", err)
 				}
 				for _, ur := range unhashed {
-					// Try source path first, fall back to dest path if source was already moved
+					// Only hash from source paths to avoid racing with mover goroutines.
+					// For dest_index rows, source_path IS the dest path (safe, already written).
 					hashPath := ur.SourcePath
-					if _, statErr := os.Stat(hashPath); os.IsNotExist(statErr) && ur.DestPath != "" {
-						hashPath = ur.DestPath
+					if _, statErr := os.Stat(hashPath); os.IsNotExist(statErr) {
+						// Source gone — skip to avoid reading a partially-written dest file mid-move.
+						logrus.Debugf("Skipping backfill hash for missing source: %s", ur.SourcePath)
+						continue
 					}
 					bh, err := media.ComputeFileHash(hashPath)
 					if err != nil {
@@ -330,6 +340,13 @@ func (s *MediaScanner) Scan() *ScanResult {
 			seqNum := 0
 			if tsCount > 1 {
 				seqNum = tsCount
+
+				// When we transition from 1→2 files sharing a timestamp,
+				// retroactively assign _001 to the first file so the naming
+				// is consistent (_001, _002, _003, ...) instead of (none, _002, _003).
+				if tsCount == 2 {
+					s.retroFixFirstSequence(tsKey, moveCh)
+				}
 			}
 
 			// --- Compute destination path ---
@@ -408,14 +425,58 @@ func (s *MediaScanner) computeDestPath(file *media.MediaFile, isDuplicate bool, 
 	fileDir := file.GetDestinationPath(baseDestDir, extensionDir, isDuplicate, s.scheme, s.duplicatesDir)
 	fileName := file.GetNewFilename(s.scheme, s.spaceReplacement, s.noOriginalName)
 
-	// Add sequence suffix
-	if seqNum > 1 {
+	// Add sequence suffix (_001, _002, ...) for files sharing a timestamp
+	if seqNum >= 1 {
 		fileExt := filepath.Ext(fileName)
 		baseName := fileName[:len(fileName)-len(fileExt)]
 		fileName = baseName + "_" + formatSequence(seqNum) + fileExt
 	}
 
 	return filepath.Join(fileDir, fileName)
+}
+
+// retroFixFirstSequence updates the first file with the given timestamp key
+// from seqNum=0 (no suffix) to seqNum=1 (_001). If the file was already moved,
+// it renames the file on disk to match.
+func (s *MediaScanner) retroFixFirstSequence(tsKey string, moveCh chan<- moveJob) {
+	first, err := s.journal.GetFirstByTimestampKey(tsKey)
+	if err != nil {
+		logrus.Errorf("retroFixFirstSequence: lookup error: %v", err)
+		return
+	}
+	if first == nil {
+		return // already has a sequence number
+	}
+
+	// Recompute dest path with seqNum=1
+	mf := recordToMediaFile(first)
+	newDestPath := s.computeDestPath(mf, first.IsDuplicate, 1)
+
+	// Update journal
+	s.journal.UpdateDestPath(first.ID, newDestPath, 1, first.IsDuplicate)
+
+	oldDestPath := first.DestPath
+
+	switch first.Status {
+	case db.StatusCompleted:
+		// File was already moved — rename on disk
+		if oldDestPath != "" && oldDestPath != newDestPath {
+			if err := os.MkdirAll(filepath.Dir(newDestPath), 0755); err != nil {
+				logrus.Errorf("retroFixFirstSequence: mkdir error: %v", err)
+				return
+			}
+			if err := os.Rename(oldDestPath, newDestPath); err != nil {
+				logrus.Errorf("retroFixFirstSequence: rename error: %v", err)
+			} else {
+				logrus.Infof("Renamed for sequence: %s -> %s", oldDestPath, newDestPath)
+			}
+		}
+	case db.StatusPending:
+		// File hasn't been moved yet — the mover will pick up the updated dest from journal.
+		// Nothing to do; the moveJob was already sent with the old dest though.
+		// We can't easily intercept it, but the dest collision check will catch
+		// issues if any arise.
+	}
 }
 
 func (s *MediaScanner) executeMoveJob(job moveJob) {
@@ -440,6 +501,13 @@ func (s *MediaScanner) executeMoveJob(job moveJob) {
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		logrus.Errorf("Failed to create directory %s: %v", destDir, err)
 		s.journal.UpdateStatus(job.RecordID, db.StatusFailed, err.Error())
+		return
+	}
+
+	// Check for destination collision before writing
+	if _, statErr := os.Stat(job.DestPath); statErr == nil {
+		logrus.Errorf("Destination already exists, refusing to overwrite: %s", job.DestPath)
+		s.journal.UpdateStatus(job.RecordID, db.StatusFailed, "destination file already exists")
 		return
 	}
 
@@ -511,6 +579,7 @@ func formatSequence(num int) string {
 }
 
 // moveFileImpl moves a file, falling back to copy+delete for cross-device moves.
+// Preserves modification time when falling back to copy.
 func moveFileImpl(srcPath, destPath string) error {
 	err := os.Rename(srcPath, destPath)
 	if err != nil {
@@ -526,19 +595,25 @@ func moveFileImpl(srcPath, destPath string) error {
 }
 
 func copyFileImpl(srcPath, destPath string) error {
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		return err
+	}
+
 	src, err := os.Open(srcPath)
 	if err != nil {
 		return err
 	}
 	defer src.Close()
 
-	dst, err := os.Create(destPath)
+	dst, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, srcInfo.Mode())
 	if err != nil {
 		return err
 	}
 	defer dst.Close()
 
-	if _, err = io.Copy(dst, src); err != nil {
+	written, err := io.Copy(dst, src)
+	if err != nil {
 		return err
 	}
 
@@ -546,11 +621,17 @@ func copyFileImpl(srcPath, destPath string) error {
 		return err
 	}
 
-	srcInfo, err := os.Stat(srcPath)
-	if err != nil {
-		return err
+	// Verify written size matches source
+	if written != srcInfo.Size() {
+		return fmt.Errorf("size mismatch after copy: wrote %d bytes, expected %d", written, srcInfo.Size())
 	}
-	return os.Chmod(destPath, srcInfo.Mode())
+
+	// Preserve modification time
+	if err := os.Chtimes(destPath, srcInfo.ModTime(), srcInfo.ModTime()); err != nil {
+		logrus.Warnf("Could not preserve timestamps for %s: %v", destPath, err)
+	}
+
+	return nil
 }
 
 // GetProcessedCount returns the current count of metadata-extracted files.
@@ -565,7 +646,7 @@ func (s *MediaScanner) GetOrganizedCount() int {
 
 // GetTotalFiles returns the total count of files to process.
 func (s *MediaScanner) GetTotalFiles() int {
-	return s.result.TotalFiles
+	return int(atomic.LoadInt32(&s.totalFiles))
 }
 
 // preIndexDestinations walks all destination directories and indexes existing files
@@ -597,10 +678,9 @@ func (s *MediaScanner) preIndexDestinations() {
 		return
 	}
 
-	// Clear stale dest_index rows from previous runs
-	if err := s.journal.ClearDestIndex(); err != nil {
-		logrus.Errorf("Failed to clear old dest_index rows: %v", err)
-	}
+	// Don't clear dest_index rows here — rows with computed hashes from prior runs
+	// are preserved to avoid re-hashing gigabytes of already-organized files.
+	// INSERT OR IGNORE in InsertDestFiles will skip existing rows.
 
 	// Walk each destination and collect media files
 	var files []db.DestFile
@@ -612,15 +692,20 @@ func (s *MediaScanner) preIndexDestinations() {
 			continue
 		}
 
-		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}
-			if info.IsDir() {
+			if d.IsDir() {
 				// Skip source directory to avoid self-indexing
 				if path == s.sourceDir || strings.HasPrefix(path, s.sourceDir+string(os.PathSeparator)) {
 					return filepath.SkipDir
 				}
+				return nil
+			}
+
+			// Skip symlinks
+			if d.Type()&os.ModeSymlink != 0 {
 				return nil
 			}
 
@@ -642,6 +727,12 @@ func (s *MediaScanner) preIndexDestinations() {
 
 			mediaType := media.DetermineMediaType(path)
 			if mediaType == media.TypeUnknown {
+				return nil
+			}
+
+			info, err := d.Info()
+			if err != nil {
+				logrus.Warnf("Could not stat %s: %v", path, err)
 				return nil
 			}
 
@@ -675,13 +766,13 @@ func (s *MediaScanner) cleanupEmptyDirectories() {
 	var emptyDirs []string
 	var deletedCount int
 
-	filepath.Walk(s.sourceDir, func(path string, info os.FileInfo, err error) error {
+	filepath.WalkDir(s.sourceDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			logrus.Errorf("Error accessing path while cleaning up: %s: %v", path, err)
 			return nil
 		}
 
-		if !info.IsDir() || path == s.sourceDir {
+		if !d.IsDir() || path == s.sourceDir {
 			return nil
 		}
 

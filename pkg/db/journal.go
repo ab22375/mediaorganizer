@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -242,9 +243,9 @@ func (j *Journal) DropAll() error {
 	return err
 }
 
-// Stats returns a map of status → count for all records.
+// Stats returns a map of status → count for all records (excluding dest_index).
 func (j *Journal) Stats() (map[FileStatus]int, error) {
-	rows, err := j.db.Query(`SELECT status, COUNT(*) FROM files GROUP BY status`)
+	rows, err := j.db.Query(`SELECT status, COUNT(*) FROM files WHERE status != 'dest_index' GROUP BY status`)
 	if err != nil {
 		return nil, err
 	}
@@ -279,10 +280,10 @@ func (j *Journal) GetUnhashedByFileSize(size int64) ([]*FileRecord, error) {
 	return scanRecords(rows)
 }
 
-// TotalCount returns the total number of records in the journal.
+// TotalCount returns the total number of records in the journal (excluding dest_index).
 func (j *Journal) TotalCount() (int, error) {
 	var count int
-	err := j.db.QueryRow(`SELECT COUNT(*) FROM files`).Scan(&count)
+	err := j.db.QueryRow(`SELECT COUNT(*) FROM files WHERE status != 'dest_index'`).Scan(&count)
 	return count, err
 }
 
@@ -294,10 +295,38 @@ type DestFile struct {
 	Extension string
 }
 
-// ClearDestIndex removes all dest_index rows from the journal.
+// ClearDestIndex removes dest_index rows that have no computed hash.
+// Rows with hashes are preserved so they don't need to be re-hashed on the next run.
 func (j *Journal) ClearDestIndex() error {
-	_, err := j.db.Exec(`DELETE FROM files WHERE status = 'dest_index'`)
+	_, err := j.db.Exec(`DELETE FROM files WHERE status = 'dest_index' AND hash = ''`)
 	return err
+}
+
+// GetFirstByTimestampKey returns the first record (lowest ID) with the given
+// timestamp_key that has sequence_num = 0 (i.e., was filed without a sequence suffix).
+func (j *Journal) GetFirstByTimestampKey(key string) (*FileRecord, error) {
+	row := j.db.QueryRow(
+		`SELECT `+fileColumns+` FROM files WHERE timestamp_key = ? AND sequence_num = 0 AND status != 'dest_index' ORDER BY id LIMIT 1`,
+		key,
+	)
+	r := &FileRecord{}
+	var isDup int
+	var status string
+	err := row.Scan(
+		&r.ID, &r.SourcePath, &r.FileSize, &r.MediaType, &r.Extension,
+		&r.CreationTime, &r.LargerDimension, &r.OriginalName, &r.TimestampKey,
+		&r.Hash, &r.DestPath, &r.SequenceNum, &isDup, &status,
+		&r.ErrorMessage, &r.CreatedAt, &r.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	r.IsDuplicate = isDup == 1
+	r.Status = FileStatus(status)
+	return r, nil
 }
 
 // InsertDestFiles batch-inserts destination files as dest_index records in a single transaction.
@@ -368,18 +397,5 @@ func scanRecords(rows *sql.Rows) ([]*FileRecord, error) {
 
 func isUniqueViolation(err error) bool {
 	// modernc.org/sqlite returns error messages containing "UNIQUE constraint failed"
-	return err != nil && contains(err.Error(), "UNIQUE constraint failed")
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchString(s, substr)
-}
-
-func searchString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }

@@ -6,11 +6,11 @@ A Golang utility for organizing media files (images, videos, audio) by creation 
 
 - **Streaming pipeline**: Files start moving as soon as metadata is extracted (no waiting for full scan)
 - **SQLite journal**: All operations tracked for automatic resume on interruption
-- **Global deduplication**: SHA-256 hash-based duplicate detection across all files (not just same-timestamp groups)
+- **Global deduplication**: xxHash-based duplicate detection across all files (not just same-timestamp groups)
 - **Cross-scan deduplication**: Pre-indexes existing destination files at startup, detecting duplicates even when scanning from different source directories
 - **Lazy hashing**: Only computes file hashes when two files share the same size, minimizing I/O
 - Recursively scans source directories for media files
-- Extracts creation dates from EXIF metadata, file metadata, or fallback to file creation date
+- Extracts creation dates from EXIF metadata (images), ffprobe container tags (video/audio), or fallback to file modification time
 - Organizes files into a structured directory hierarchy based on dates
 - Renames files with creation timestamp and resolution information
 - Handles duplicate files with sequence numbering
@@ -206,6 +206,7 @@ GOOS=linux GOARCH=amd64 go build -o mediaorganizer-linux .
 ## Requirements
 
 - Go 1.24 or higher
+- **Optional**: `ffprobe` (from FFmpeg) for accurate video/audio creation dates. Without it, falls back to file modification time
 
 ## License
 

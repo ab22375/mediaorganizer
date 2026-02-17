@@ -3,6 +3,7 @@ module mediaorganizer
 go 1.24.2
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.5

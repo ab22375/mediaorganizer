@@ -36,7 +36,7 @@ Media Organizer is a Go utility that organizes media files (images, videos, audi
 - **main.go** - Entry point, loads config, initializes SQLite journal, wires up signal handling, starts scanner
 - **pkg/config** - Configuration loading via CLI flags (spf13/pflag) and YAML/JSON files (spf13/viper)
 - **pkg/db** - SQLite journal layer (modernc.org/sqlite, pure Go) for tracking file operations, resume, and dedup
-- **pkg/media** - Media type definitions and metadata extraction (EXIF for images via rwcarlsen/goexif)
+- **pkg/media** - Media type definitions and metadata extraction (EXIF for images via rwcarlsen/goexif, ffprobe for video/audio, xxHash for dedup)
 - **pkg/processor** - Streaming pipeline scanner with concurrent workers
 - **pkg/utils** - Progress reporting utilities
 
@@ -48,15 +48,15 @@ The scanner uses a 4-stage streaming pipeline:
 walker goroutine → metadata workers (N) → organizer goroutine → mover workers (N)
 ```
 
-1. **Walker**: Walks source directory, skips completed files (resume mode), sends paths to channel
+1. **Walker**: Uses `filepath.WalkDir` (not Walk) to walk source directory, skips symlinks and completed files (resume mode), sends paths to channel
 2. **Metadata workers** (N goroutines): Extract metadata via `media.ExtractFileMetadata()` — no hashing at this stage
 3. **Organizer** (single goroutine): Serializes all SQLite writes
    - Inserts file records into journal
-   - Lazy hashing: SHA-256 only when `CountByFileSize > 1`, backfills earlier same-size files
+   - Lazy hashing: xxHash only when `CountByFileSize > 1`, backfills earlier same-size files (source paths only, never dest paths mid-pipeline)
    - Global dedup: `GetByHash()` to detect duplicates across all files
    - Sequence numbering: `CountByTimestampKey()` for files sharing a timestamp
    - Computes destination path, updates journal, sends move jobs
-4. **Mover workers** (N goroutines): MkdirAll + move/copy file, update journal status
+4. **Mover workers** (N goroutines): Checks dest collision → MkdirAll → move/copy file (with O_EXCL) → verify size → preserve timestamps → update journal status
 
 ### SQLite Journal (pkg/db/journal.go)
 
@@ -65,15 +65,22 @@ walker goroutine → metadata workers (N) → organizer goroutine → mover work
 - Single `files` table with indexes on status, file_size, hash, timestamp_key
 - FileStatus values: `pending`, `completed`, `failed`, `dry_run`, `dest_index`
 - Resume: `GetCompletedSourcePaths()` to skip, `GetPendingFiles()` to re-queue, `ResetFailed()` for retry
-- Destination pre-index: `InsertDestFiles()` batch inserts, `ClearDestIndex()` cleans up
+- Destination pre-index: `InsertDestFiles()` batch inserts, `ClearDestIndex()` removes only unhashed rows (hashed rows persist across runs)
+- Helper: `GetFirstByTimestampKey()` for retroactive sequence renaming
 
 ### Key Design Decisions
 
 - **Organizer is single-goroutine**: No concurrent SQLite write contention. All DB mutations happen here.
-- **Lazy hashing**: Avoids expensive SHA-256 for unique-size files. Only hashes when size collision detected. Backfill runs for ALL unhashed same-size files (not just on the 1-to-2 transition) to support destination pre-indexed files.
+- **Lazy hashing**: Avoids expensive hashing for unique-size files. Only hashes when size collision detected. Backfill runs for ALL unhashed same-size files but only reads source paths (never dest paths mid-pipeline to avoid race with movers).
+- **xxHash (XXH64) for dedup**: Non-cryptographic, 5-10x faster than SHA-256. Sufficient collision resistance for dedup. Output is 16-char hex string.
 - **Hash is empty by default**: `ExtractFileMetadata()` does NOT compute hash. The organizer calls `media.ComputeFileHash()` only when needed.
-- **Duplicate detection is global**: Any two files anywhere with matching SHA-256 hash are duplicates (not just same-timestamp groups).
-- **Cross-scan dedup via destination pre-indexing**: `preIndexDestinations()` runs before the pipeline, walking all destination dirs and inserting existing files as `dest_index` rows (path + size only, no file reads). The existing `CountByFileSize`/`GetByHash` logic naturally picks them up. Rows are cleaned up before final stats.
+- **Duplicate detection is global**: Any two files anywhere with matching hash are duplicates (not just same-timestamp groups).
+- **Cross-scan dedup via destination pre-indexing**: `preIndexDestinations()` runs before the pipeline, walking all destination dirs and inserting existing files as `dest_index` rows (path + size only, no file reads). Hashed rows persist across runs to avoid re-hashing. The existing `CountByFileSize`/`GetByHash` logic naturally picks them up.
+- **Sequence numbering consistency**: When a second file shares a timestamp key, `retroFixFirstSequence()` retroactively renames the first file to `_001` (including on disk if already moved).
+- **Symlink safety**: All `WalkDir` calls skip symlinks. No risk of infinite loops from cyclic symlinks.
+- **Dest collision protection**: Mover checks `os.Stat` before writing; `copyFileImpl` uses `O_EXCL`. Copy also verifies written size matches source and preserves mtime.
+- **ffprobe for video/audio**: `extractCreationTimeViaFFprobe()` gets real creation dates from container metadata. Graceful fallback to ModTime if ffprobe absent.
+- **Atomic counters**: `totalFiles`, `processed`, `organized` are all `int32` with `sync/atomic` — safe for concurrent goroutine access.
 
 ### Output Structure
 
@@ -87,7 +94,7 @@ Uses per-media-type destinations (`--image-dest`, `--video-dest`, `--audio-dest`
 Uses a unified destination (`--dest`), all media types in one directory:
 `<dest>/YYYY/YYYY-MM/YYYY-MM-DD/<extension>/YYYYMMDD-HHMMSS_<dimension>_<original_name>.<ext>`
 
-Duplicates (same hash) get sequence suffixes (`_002`, `_003`) and can be routed to a `duplicates/` subfolder.
+Duplicates (same hash) get sequence suffixes (`_001`, `_002`, `_003`) and can be routed to a `duplicates/` subfolder. When multiple files share a timestamp, all receive sequence suffixes for consistency.
 
 ### Configuration Priority
 
