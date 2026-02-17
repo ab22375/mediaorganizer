@@ -168,6 +168,13 @@ func (j *Journal) UpdateDestPath(id int64, destPath string, seqNum int, isDuplic
 	return err
 }
 
+// GetDestPath returns the current dest_path for a record.
+func (j *Journal) GetDestPath(id int64) (string, error) {
+	var destPath string
+	err := j.db.QueryRow(`SELECT dest_path FROM files WHERE id = ?`, id).Scan(&destPath)
+	return destPath, err
+}
+
 // CountByFileSize returns how many records have the given file_size.
 func (j *Journal) CountByFileSize(size int64) (int, error) {
 	var count int

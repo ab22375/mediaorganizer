@@ -472,14 +472,17 @@ func (s *MediaScanner) retroFixFirstSequence(tsKey string, moveCh chan<- moveJob
 			}
 		}
 	case db.StatusPending:
-		// File hasn't been moved yet — the mover will pick up the updated dest from journal.
-		// Nothing to do; the moveJob was already sent with the old dest though.
-		// We can't easily intercept it, but the dest collision check will catch
-		// issues if any arise.
+		// File hasn't been moved yet — the mover re-reads dest_path from the
+		// journal before executing, so it will pick up this update.
 	}
 }
 
 func (s *MediaScanner) executeMoveJob(job moveJob) {
+	// Re-read dest path from journal to pick up any retroactive sequence fixes
+	if latestDest, err := s.journal.GetDestPath(job.RecordID); err == nil && latestDest != "" {
+		job.DestPath = latestDest
+	}
+
 	operation := "move"
 	if s.copyFiles {
 		operation = "copy"
