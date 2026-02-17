@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build the binary
 make build
 
+# Cross-compile for Linux
+GOOS=linux GOARCH=amd64 go build -o mediaorganizer-linux .
+
 # Run tests
 make test
 

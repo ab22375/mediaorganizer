@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Linux cross-compilation**: Verified fully cross-platform (pure Go, no CGo). Built and deployed to Linux (PopOS) via `GOOS=linux GOARCH=amd64 go build`
 - **Cross-scan duplicate detection**: Pre-indexes existing files in destination directories before processing, so duplicates from previous scans with different source directories are detected
   - New `dest_index` file status in journal for pre-indexed destination files
   - `preIndexDestinations()` walks all configured destination directories at scan start

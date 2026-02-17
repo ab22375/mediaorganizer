@@ -1,4 +1,4 @@
-# Media Organizer
+q# Media Organizer
 
 A Golang utility for organizing media files (images, videos, audio) by creation date.
 
@@ -109,7 +109,7 @@ go build
 SRC="/path/to/source"
 DST="/path/to/destination"
 DUP="/path/to/duplicates"
-./mediaorganizer -j 6 -no-original-name --source "$SRC" --scheme date_first --dest "$DST" --duplicates-dir DUP
+./mediaorganizer -j 6 --no-original-name --source "$SRC" --scheme date_first --dest "$DST" --duplicates-dir "$DUP"
 
 ```
 
@@ -194,6 +194,14 @@ The program creates a SQLite journal database (default: `<source>/.mediaorganize
 - Continue processing any remaining files
 
 Use `--fresh` to start over from scratch, or `--db` to specify a custom journal path.
+
+## Cross-Platform
+
+The binary is fully cross-platform (pure Go, no CGo dependencies). To build for Linux from macOS:
+
+```bash
+GOOS=linux GOARCH=amd64 go build -o mediaorganizer-linux .
+```
 
 ## Requirements
 
